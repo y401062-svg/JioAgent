@@ -1,0 +1,21 @@
+{
+  "teamId": "test123",
+  "name": "test",
+  "description": "\uCF54\uB4DC \uBD84\uC11D \uBC0F \uAC1C\uBC1C \uD300\uC785\uB2C8\uB2E4.",
+  "leaderAgentId": "CodingTeamLeader",
+  "maxTaskCount": 50,
+  "maxTrashTaskCount": 200,
+  "maxQuestionCount": 20,
+  "memberAgentIds": [
+    "baeksoo",
+    "choi",
+    "CodingTeamLeader",
+    "hanroro",
+    "hipi",
+    "hyori",
+    "jaeseok",
+    "jio",
+    "kiyoon",
+    "rain"
+  ]
+}

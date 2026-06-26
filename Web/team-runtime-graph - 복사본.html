@@ -1,0 +1,1535 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Team Runtime Graph</title>
+  <script src="./vis-network.min.js"></script>
+  <style>
+    /* Root CSS Custom Properties */
+    :root {
+      --text: #111827;
+      --muted: #6b7280;
+      --panel: #ffffff;
+      --line: #d1d5db;
+      --soft: #f3f4f6;
+      --blue: #2563eb;
+    }
+
+    html,
+    body,
+    #graph {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f8fafc;
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    /* Layout & Shell */
+    .shell {
+      box-sizing: border-box;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      width: 100%;
+      height: 100%;
+      gap: 10px;
+      padding: 14px;
+    }
+
+    /* Toolbar & Legend */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 38px;
+    }
+
+    .title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .title strong {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .title span {
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    /* Canvas & Empty State */
+      box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.12);
+    }
+
+    .canvas-wrap {
+      position: relative;
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    #graph {
+      position: absolute;
+      inset: 0;
+    }
+
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-sizing: border-box;
+      padding: 28px;
+      color: var(--muted);
+      font-size: 13px;
+      background: var(--panel);
+      text-align: center;
+    }
+
+    .empty strong {
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .empty code {
+      display: block;
+      max-width: min(760px, 90vw);
+      overflow: hidden;
+      color: #374151;
+      font-family: Consolas, "Courier New", monospace;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty[hidden] {
+    /* Dialog */
+      display: none;
+    }
+
+    .dialog-backdrop {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.22);
+      z-index: 10;
+    }
+
+    .dialog-backdrop[hidden] {
+      display: none;
+    }
+
+    .team-dialog {
+      width: min(560px, calc(100vw - 48px));
+      max-height: min(680px, calc(100vh - 48px));
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+    }
+
+    .team-dialog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .team-dialog-title {
+      min-width: 0;
+    }
+
+    .team-dialog-title strong,
+    .team-dialog-title span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .team-dialog-title strong {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .team-dialog-title span {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .team-dialog-actions {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-button {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #374151;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .icon-button:hover {
+      border-color: #94a3b8;
+      background: #f8fafc;
+    }
+
+    .team-dialog-body {
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .status-item {
+      min-width: 0;
+    }
+
+    .status-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .status-item strong {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .details-toggle {
+      width: 100%;
+      margin-top: 16px;
+      padding: 9px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #f8fafc;
+      color: #111827;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .details-toggle:hover {
+      border-color: #94a3b8;
+      background: #f1f5f9;
+    }
+
+    .team-details {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+      color: #374151;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .team-details[hidden] {
+      display: none;
+    }
+
+    .team-details h3 {
+      margin: 12px 0 6px;
+      color: #111827;
+      font-size: 13px;
+    }
+
+    .team-details h3:first-child {
+      margin-top: 0;
+    }
+
+    .team-details ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+    }
+
+    .team-details li {
+      margin: 3px 0;
+    /* Dark Mode Overrides */
+    }
+  
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="toolbar">
+      <div class="title">
+        <strong>Team Runtime Graph</strong>
+        <span id="summary">Waiting for FleetManager data...</span>
+      </div>
+      <div class="legend" aria-label="Status legend">
+        <span class="legend-item"><i class="dot" style="background:#e5e7eb"></i>Idle</span>
+        <span class="legend-item"><i class="dot" style="background:#bfdbfe"></i>Running</span>
+        <span class="legend-item"><i class="dot" style="background:#fef3c7"></i>Waiting</span>
+        <span class="legend-item"><i class="dot" style="background:#fee2e2"></i>Issue</span>
+      </div>
+    </header>
+    <section class="canvas-wrap">
+      <div id="graph"></div>
+      <div id="empty" class="empty" hidden>
+        <strong>No teams configured.</strong>
+        <span id="empty-detail">Waiting for diagnostics...</span>
+      </div>
+      <div id="team-dialog-backdrop" class="dialog-backdrop" hidden>
+        <section class="team-dialog" role="dialog" aria-modal="true" aria-labelledby="team-dialog-name">
+          <header class="team-dialog-header">
+            <div class="team-dialog-title">
+              <strong id="team-dialog-name">Team Status</strong>
+              <span id="team-dialog-subtitle">Frozen at click time</span>
+            </div>
+            <div class="team-dialog-actions">
+              <button id="team-dialog-refresh" class="icon-button" type="button" title="Refresh">↻</button>
+              <button id="team-dialog-close" class="icon-button" type="button" title="Close">×</button>
+            </div>
+          </header>
+          <div id="team-dialog-body" class="team-dialog-body"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const graphElement = document.getElementById("graph");
+    const summaryElement = document.getElementById("summary");
+    const emptyElement = document.getElementById("empty");
+    const emptyDetailElement = document.getElementById("empty-detail");
+    const teamDialogBackdrop = document.getElementById("team-dialog-backdrop");
+    const teamDialogName = document.getElementById("team-dialog-name");
+    const teamDialogSubtitle = document.getElementById("team-dialog-subtitle");
+    const teamDialogBody = document.getElementById("team-dialog-body");
+    const teamDialogRefresh = document.getElementById("team-dialog-refresh");
+    const teamDialogClose = document.getElementById("team-dialog-close");
+    let network;
+    let networkEventsBound = false;
+    let latestSnapshot;
+    let selectedTeamId = "";
+    let runningAgentNodeIds = new Set();
+    let stoppedAgentNodeIds = new Set();
+    let leaderAgentNodeIds = new Set();
+    let agentNodeLabels = new Map();
+    let hoveredNodeId = "";
+    let runningPulseFrame = 0;
+    let labelMeasureContext = null;
+    const agentWorkNoteStyle = {
+      font: '13px "Segoe UI Semibold", "Segoe UI", Arial, sans-serif',
+      lineHeight: 18,
+      gapFromNode: 10,
+      maxWidth: 260,
+      maxLines: 2,
+      taskColor: "#1d4ed8",
+      questionColor: "#1e40af",
+      shadowColor: "rgba(255, 255, 255, 0.9)"
+    };
+    const agentNodeStyle = {
+      leader: {
+        width: 150,
+        height: 48,
+        radius: 24,
+        contentWidth: 110,
+        margin: { top: 14, right: 20, bottom: 14, left: 20 },
+        border: "#111827",
+        borderWidth: 2,
+        shadow: { enabled: true, color: "rgba(37, 99, 235, 0.10)", size: 6, x: 0, y: 3 }
+      },
+      member: {
+        width: 150,
+        height: 48,
+        radius: 24,
+        contentWidth: 110,
+        margin: { top: 14, right: 20, bottom: 14, left: 20 },
+        border: "#9ca3af",
+        borderWidth: 2,
+        shadow: { enabled: true, color: "rgba(37, 99, 235, 0.10)", size: 6, x: 0, y: 3 }
+      }
+    };
+    const runningNodeShimmer = {
+      durationMs: 1550,
+      radius: 24,
+      fill: "#eff6ff",
+      border: "#2563eb",
+      label: "#1d4ed8",
+      fillOpacity: 0.65,
+      bandOpacity: 0.55,
+      bandBlur: 9
+    };
+    const stoppedNodeTone = {
+      fill: "#fee2e2",
+      border: "#dc2626",
+      label: "#991b1b",
+      shadow: "rgba(220, 38, 38, 0.16)"
+    };
+    function statusColor(status) {
+      const value = String(status || "").toLowerCase();
+      if (value.includes("stopped")) {
+        return { background: "#fecaca", border: "#991b1b", foreground: "#7f1d1d" };
+      }
+      if (!value || value.includes("idle") || value.includes("none")) {
+        return { background: "#e5e7eb", border: "#9ca3af", foreground: "#374151" };
+      }
+      if (value.includes("busy") || value.includes("running") || value.includes("started")) {
+        return { background: "#bfdbfe", border: "#1d4ed8", foreground: "#1e3a8a" };
+      }
+      if (value.includes("fail") || value.includes("error") || value.includes("missing") || value.includes("not configured")) {
+        return { background: "#fee2e2", border: "#dc2626", foreground: "#991b1b" };
+      }
+      if (value.includes("wait") || value.includes("question") || value.includes("warning") || value.includes("unavailable")) {
+        return { background: "#fef3c7", border: "#d97706", foreground: "#92400e" };
+      }
+      return { background: "#e5e7eb", border: "#9ca3af", foreground: "#374151" };
+    }
+
+    function shortText(value, length) {
+      const text = String(value || "").trim();
+      if (text.length <= length) {
+        return text;
+      }
+      return `${text.slice(0, length - 1)}...`;
+    }
+
+    function isRunningStatus(status) {
+      const value = String(status || "").toLowerCase();
+      return value.includes("busy") || value.includes("running") || value.includes("started");
+    }
+
+    function isStoppedStatus(status) {
+      const value = String(status || "").toLowerCase();
+      return value.includes("stopped") || value.includes("stop detected") || value.includes("terminated");
+    }
+
+    function formatAgentNodeLabel(agentName, isLeaderAgent) {
+      const label = isLeaderAgent ? `👑 ${agentName}` : agentName;
+      return fitNodeLabel(label, agentNodeStyle.member.contentWidth - 8);
+    }
+
+    function fitNodeLabel(label, maxWidth) {
+      const ctx = getLabelMeasureContext();
+      if (!ctx || ctx.measureText(label).width <= maxWidth) {
+        return label;
+      }
+
+      let low = 0;
+      let high = label.length;
+      while (low < high) {
+        const mid = Math.ceil((low + high) / 2);
+        const candidate = label.slice(0, mid) + '\u2026';
+        if (ctx.measureText(candidate).width <= maxWidth) {
+          low = mid;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      return label.slice(0, Math.max(0, low)) + '\u2026';
+    }
+
+    function getLabelMeasureContext() {
+      if (!labelMeasureContext) {
+        const canvas = document.createElement("canvas");
+        labelMeasureContext = canvas.getContext("2d");
+      }
+
+      if (labelMeasureContext) {
+        labelMeasureContext.font = '16px "Segoe UI Semibold", "Segoe UI", Arial, sans-serif';
+      }
+
+      return labelMeasureContext;
+    }
+
+    function createAgentInteractionNodeOptions(label) {
+      const style = agentNodeStyle.member;
+      // Keep hit-testing in vis-network's built-in box node, and paint the
+      // actual pill design in afterDrawing. This avoids custom renderer bounds
+      // drifting away from the visible node background.
+      return {
+        label,
+        shape: "box",
+        margin: style.margin,
+        widthConstraint: { minimum: style.width, maximum: style.width },
+        color: {
+          background: "rgba(255,255,255,0)",
+          border: "rgba(255,255,255,0)",
+          highlight: { background: "rgba(255,255,255,0)", border: "rgba(255,255,255,0)" },
+          hover: { background: "rgba(255,255,255,0)", border: "rgba(255,255,255,0)" }
+        },
+        font: {
+          color: "rgba(17,24,39,0)",
+          size: 16,
+          face: "Segoe UI Semibold",
+          multi: false
+        },
+        borderWidth: 0,
+        borderWidthSelected: 0,
+        shadow: { enabled: false }
+      };
+    }
+
+    function drawAgentNode(ctx, rect, label, isLeaderAgent, isRunningAgent, isStoppedAgent, state) {
+      if (isRunningAgent) {
+        const phase = (performance.now() % runningNodeShimmer.durationMs) / runningNodeShimmer.durationMs;
+        drawRunningNodeShimmer(ctx, rect, phase, label);
+        return;
+      }
+
+      const style = isLeaderAgent ? agentNodeStyle.leader : agentNodeStyle.member;
+      const isInteractive = state.hover || state.selected;
+      const fill = isStoppedAgent ? stoppedNodeTone.fill : "#ffffff";
+      const border = isInteractive
+        ? "#2563eb"
+        : isStoppedAgent
+          ? stoppedNodeTone.border
+          : style.border;
+      const borderWidth = isInteractive ? 2.5 : style.borderWidth;
+      const labelColor = isStoppedAgent ? stoppedNodeTone.label : "#111827";
+
+      ctx.save();
+      ctx.shadowColor = isStoppedAgent ? stoppedNodeTone.shadow : style.shadow.color;
+      ctx.shadowBlur = style.shadow.size;
+      ctx.shadowOffsetX = style.shadow.x;
+      ctx.shadowOffsetY = style.shadow.y;
+      ctx.fillStyle = fill;
+      roundRectPath(ctx, rect.left, rect.top, rect.width, rect.height, style.radius);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.lineWidth = borderWidth;
+      ctx.strokeStyle = border;
+      roundRectPath(ctx, rect.left, rect.top, rect.width, rect.height, style.radius);
+      ctx.stroke();
+      ctx.restore();
+
+      drawAgentNodeLabel(ctx, rect, label, labelColor);
+    }
+
+    function drawAgentNodeLabel(ctx, rect, label, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.font = '16px "Segoe UI Semibold", "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, rect.left + rect.width / 2, rect.top + rect.height / 2);
+      ctx.restore();
+    }
+
+    function teamTone(index) {
+      const tones = [
+        { line: "#2563eb", highlight: "#1d4ed8", label: "#1e3a8a" },
+        { line: "#059669", highlight: "#047857", label: "#065f46" },
+        { line: "#7c3aed", highlight: "#6d28d9", label: "#5b21b6" },
+        { line: "#ea580c", highlight: "#c2410c", label: "#9a3412" },
+        { line: "#0891b2", highlight: "#0e7490", label: "#155e75" },
+        { line: "#be123c", highlight: "#9f1239", label: "#881337" },
+        { line: "#4f46e5", highlight: "#4338ca", label: "#3730a3" },
+        { line: "#65a30d", highlight: "#4d7c0f", label: "#365314" }
+      ];
+      return tones[index % tones.length];
+    }
+
+    function render(snapshot) {
+      latestSnapshot = snapshot;
+      const teams = Array.isArray(snapshot?.teams) ? snapshot.teams : [];
+      const agents = Array.isArray(snapshot?.agents) ? snapshot.agents : [];
+      const diagnostics = snapshot?.diagnostics || {};
+      const agentByName = new Map(agents.map(agent => [String(agent.agentName || "").toLowerCase(), agent]));
+      const leaderNames = new Set(teams
+        .map(team => String(team.leaderAgentId || "").trim().toLowerCase())
+        .filter(Boolean));
+      const nextRunningAgentNodeIds = new Set();
+      const nextStoppedAgentNodeIds = new Set();
+      const nextLeaderAgentNodeIds = new Set();
+      const nextAgentNodeLabels = new Map();
+      const nodes = [];
+      const edges = [];
+      const teamToneById = new Map();
+      teams.forEach((team, index) => {
+        const teamId = String(team.teamId || team.name || "").trim();
+        if (teamId) {
+          teamToneById.set(teamId.toLowerCase(), teamTone(index));
+        }
+      });
+
+      for (const team of teams) {
+        const teamId = String(team.teamId || team.name || "").trim();
+        if (!teamId) {
+          continue;
+        }
+
+        const status = team.status || "idle";
+        const colors = statusColor(status);
+        const tone = teamToneById.get(teamId.toLowerCase()) || teamTone(0);
+        nodes.push({
+          id: `team:${teamId}`,
+          label: `${team.name || teamId}`,
+          title: `${team.name || teamId}\n${team.description || ""}\nRun: ${team.currentRunId || "(none)"}`,
+          shape: "box",
+          margin: 12,
+          widthConstraint: { minimum: 150, maximum: 230 },
+          color: {
+            background: "#ffffff",
+            border: tone.line,
+            highlight: { background: "#ffffff", border: tone.highlight }
+          },
+          font: { color: "#111827", size: 16, face: "Segoe UI Semibold", multi: true },
+          borderWidth: 3,
+          shadow: { enabled: true, color: "rgba(15,23,42,0.12)", size: 8, x: 0, y: 2 },
+          level: 0
+        });
+
+        const leaderName = String(team.leaderAgentId || "").trim();
+        const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+        for (const rawMember of members) {
+          const memberName = String(rawMember || "").trim();
+          if (!memberName) {
+            continue;
+          }
+
+          const isLeader = leaderName && memberName.toLowerCase() === leaderName.toLowerCase();
+          edges.push({
+            from: `team:${teamId}`,
+            to: `agent:${memberName}`,
+            label: isLeader ? "leader" : "",
+            color: { color: tone.line, highlight: tone.highlight },
+            dashes: !isLeader,
+            width: isLeader ? 3 : 1.8,
+            arrows: { to: { enabled: false } },
+            font: { size: isLeader ? 13 : 11, color: tone.label, strokeWidth: 4, strokeColor: "#ffffff" },
+            smooth: {
+              type: isLeader ? "curvedCW" : "curvedCCW",
+              roundness: isLeader ? 0.1 : 0.14
+            }
+          });
+        }
+      }
+
+      for (const agent of agents) {
+        const agentName = String(agent.agentName || "").trim();
+        if (!agentName) {
+          continue;
+        }
+
+        const status = agent.status || "Not configured";
+        const isLeaderAgent = leaderNames.has(agentName.toLowerCase());
+        const nodeId = `agent:${agentName}`;
+        if (isRunningStatus(status)) {
+          nextRunningAgentNodeIds.add(nodeId);
+        }
+        if (isStoppedStatus(status)) {
+          nextStoppedAgentNodeIds.add(nodeId);
+        }
+        const label = formatAgentNodeLabel(agentName, isLeaderAgent);
+        nextAgentNodeLabels.set(nodeId, label);
+        if (isLeaderAgent) {
+          nextLeaderAgentNodeIds.add(nodeId);
+        }
+        nodes.push({
+          id: nodeId,
+          title: `${agentName}\n${agent.description || ""}\nStatus: ${status}`,
+          ...createAgentInteractionNodeOptions(label),
+          level: 1
+        });
+      }
+
+      for (const team of teams) {
+        const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+        for (const rawMember of members) {
+          const memberName = String(rawMember || "").trim();
+          if (memberName && !agentByName.has(memberName.toLowerCase())) {
+            const isLeaderAgent = leaderNames.has(memberName.toLowerCase());
+            const nodeId = `agent:${memberName}`;
+            const label = formatAgentNodeLabel(memberName, isLeaderAgent);
+            nextAgentNodeLabels.set(nodeId, label);
+            if (isLeaderAgent) {
+              nextLeaderAgentNodeIds.add(nodeId);
+            }
+            nodes.push({
+              id: nodeId,
+              ...createAgentInteractionNodeOptions(label),
+              level: 1
+            });
+          }
+        }
+      }
+
+      emptyElement.hidden = nodes.length > 0;
+      runningAgentNodeIds = nextRunningAgentNodeIds;
+      stoppedAgentNodeIds = nextStoppedAgentNodeIds;
+      leaderAgentNodeIds = nextLeaderAgentNodeIds;
+      agentNodeLabels = nextAgentNodeLabels;
+      summaryElement.textContent = `${teams.length} teams, ${agents.length} agents, TeamSettings files ${diagnostics.teamSettingsFileCount ?? "?"}, updated ${new Date().toLocaleTimeString()}`;
+      emptyDetailElement.innerHTML = [
+        `Snapshot teams: ${diagnostics.snapshotTeamCount ?? teams.length}`,
+        `Visual teams: ${diagnostics.visualTeamCount ?? "?"}`,
+        `TeamSettings files: ${diagnostics.teamSettingsFileCount ?? "?"}`,
+        `<code>${diagnostics.teamSettingsDirectory || "TeamSettings directory unknown"}</code>`,
+        `<code>${diagnostics.appBaseDirectory || "Base directory unknown"}</code>`
+      ].join("<br>");
+
+      const previousPositions = network ? network.getPositions() : {};
+      const previousView = network
+        ? {
+            position: network.getViewPosition(),
+            scale: network.getScale()
+          }
+        : null;
+      for (const node of nodes) {
+        const position = previousPositions[node.id];
+        if (position) {
+          node.x = position.x;
+          node.y = position.y;
+        }
+      }
+      const useWideInitialLayout = assignWideInitialPositions(nodes, teams, previousPositions);
+
+      const data = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges)
+      };
+      const options = {
+        autoResize: true,
+        interaction: {
+          hover: true,
+          multiselect: false,
+          navigationButtons: true,
+          tooltipDelay: 250
+        },
+        layout: {
+          improvedLayout: true
+        },
+        physics: {
+          enabled: !useWideInitialLayout,
+          stabilization: { iterations: 160, updateInterval: 20 },
+          barnesHut: {
+            gravitationalConstant: -7200,
+            centralGravity: 0.18,
+            springLength: 150,
+            springConstant: 0.035,
+            damping: 0.24,
+            avoidOverlap: 0.55
+          }
+        },
+        edges: {
+          smooth: { type: "curvedCW", roundness: 0.12 }
+        }
+      };
+
+      if (!network) {
+        network = new vis.Network(graphElement, data, options);
+        bindNetworkEvents();
+        if (useWideInitialLayout) {
+          network.fit({ animation: true });
+          network.setOptions({ physics: { enabled: false } });
+          scheduleRunningPulse();
+          requestGraphRedraw();
+          return;
+        }
+
+        network.once("stabilized", () => {
+          network.fit({ animation: true });
+          network.setOptions({ physics: { enabled: false } });
+          scheduleRunningPulse();
+          requestGraphRedraw();
+        });
+        return;
+      }
+
+      const hasNewNodes = nodes.some(node => !previousPositions[node.id]);
+      if (hasNewNodes) {
+        network.setData(data);
+        network.setOptions(options);
+        if (useWideInitialLayout) {
+          network.setOptions({ physics: { enabled: false } });
+          restoreView(previousView);
+          scheduleRunningPulse();
+          requestGraphRedraw();
+          return;
+        }
+
+        network.once("stabilized", () => {
+          network.setOptions({ physics: { enabled: false } });
+          restoreView(previousView);
+          scheduleRunningPulse();
+          requestGraphRedraw();
+        });
+        return;
+      }
+
+      network.setOptions({ ...options, physics: { enabled: false } });
+      network.setData(data);
+      restoreView(previousView);
+      scheduleRunningPulse();
+      requestGraphRedraw();
+    }
+
+    function assignWideInitialPositions(nodes, teams, previousPositions) {
+      const bounds = graphElement.getBoundingClientRect();
+      if (bounds.width < bounds.height * 1.15) {
+        return false;
+      }
+
+      const teamIds = teams
+        .map(team => String(team.teamId || team.name || "").trim())
+        .filter(Boolean);
+      if (teamIds.length === 0) {
+        return false;
+      }
+
+      const positions = new Map();
+      const nodeIdByAgentName = new Map(nodes
+        .filter(node => String(node.id || "").startsWith("agent:"))
+        .map(node => {
+          const nodeId = String(node.id);
+          return [nodeId.slice("agent:".length).trim().toLowerCase(), nodeId];
+        }));
+      const teamY = new Map();
+      const teamSpacing = Math.max(150, Math.min(230, bounds.height / Math.max(1, teamIds.length)));
+      const teamStartY = -((teamIds.length - 1) * teamSpacing) / 2;
+      teamIds.forEach((teamId, index) => {
+        const y = teamStartY + index * teamSpacing;
+        teamY.set(teamId.toLowerCase(), y);
+        positions.set(`team:${teamId}`, { x: -160, y });
+      });
+
+      const leaderY = new Map();
+      const memberNames = new Set();
+      const memberY = new Map();
+      const allLeaderNames = new Set(teams
+        .map(team => String(team.leaderAgentId || "").trim().toLowerCase())
+        .filter(Boolean));
+      for (const team of teams) {
+        const teamId = String(team.teamId || team.name || "").trim();
+        const y = teamY.get(teamId.toLowerCase()) ?? 0;
+        const leaderName = String(team.leaderAgentId || "").trim();
+        if (leaderName) {
+          const key = leaderName.toLowerCase();
+          const values = leaderY.get(key) || [];
+          values.push(y);
+          leaderY.set(key, values);
+        }
+
+        const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+        for (const rawMember of members) {
+          const memberName = String(rawMember || "").trim();
+          if (!memberName) {
+            continue;
+          }
+
+          if (!allLeaderNames.has(memberName.toLowerCase())) {
+            const key = memberName.toLowerCase();
+            const values = memberY.get(key) || [];
+            values.push(y);
+            memberY.set(key, values);
+            memberNames.add(memberName);
+          }
+        }
+      }
+
+      for (const [leaderName, values] of leaderY.entries()) {
+        const averageY = values.reduce((sum, value) => sum + value, 0) / values.length;
+        const nodeId = nodeIdByAgentName.get(leaderName);
+        if (nodeId) {
+          positions.set(nodeId, { x: -460, y: averageY });
+        }
+      }
+
+      const sortedMembers = Array.from(memberNames).sort((left, right) => {
+        const leftValues = memberY.get(left.toLowerCase()) || [0];
+        const rightValues = memberY.get(right.toLowerCase()) || [0];
+        const leftY = leftValues.reduce((sum, value) => sum + value, 0) / leftValues.length;
+        const rightY = rightValues.reduce((sum, value) => sum + value, 0) / rightValues.length;
+        return leftY === rightY
+          ? left.localeCompare(right, undefined, { sensitivity: "base" })
+          : leftY - rightY;
+      });
+      const columns = sortedMembers.length > 8 ? 2 : 1;
+      const rows = Math.max(1, Math.ceil(sortedMembers.length / columns));
+      const memberSpacing = Math.max(96, Math.min(130, bounds.height / Math.max(4, rows)));
+      const memberStartY = -((rows - 1) * memberSpacing) / 2;
+      sortedMembers.forEach((memberName, index) => {
+        const row = Math.floor(index / columns);
+        const column = index % columns;
+        const nodeId = nodeIdByAgentName.get(memberName.toLowerCase());
+        if (nodeId) {
+          positions.set(nodeId, {
+            x: 230 + column * 260,
+            y: memberStartY + row * memberSpacing
+          });
+        }
+      });
+
+      let applied = false;
+      for (const node of nodes) {
+        if (previousPositions[node.id]) {
+          continue;
+        }
+
+        const position = positions.get(node.id) || positions.get(String(node.id).toLowerCase());
+        if (!position) {
+          continue;
+        }
+
+        node.x = position.x;
+        node.y = position.y;
+        applied = true;
+      }
+
+      return applied;
+    }
+
+    function restoreView(view) {
+      if (!network || !view) {
+        return;
+      }
+
+      network.moveTo({
+        position: view.position,
+        scale: view.scale,
+        animation: false
+      });
+    }
+
+    function resetGraphView() {
+      if (!network) {
+        return;
+      }
+
+      network.fit({
+        animation: {
+          duration: 300,
+          easingFunction: "easeInOutQuad"
+        }
+      });
+    }
+
+    function requestGraphRedraw() {
+      if (network) {
+        network.redraw();
+      }
+    }
+
+    function scheduleRunningPulse() {
+      if (runningPulseFrame || !network || runningAgentNodeIds.size === 0) {
+        return;
+      }
+
+      const tick = () => {
+        runningPulseFrame = 0;
+        if (!network || runningAgentNodeIds.size === 0) {
+          return;
+        }
+
+        network.redraw();
+        runningPulseFrame = requestAnimationFrame(tick);
+      };
+
+      runningPulseFrame = requestAnimationFrame(tick);
+    }
+
+    function drawAgentNodes(ctx) {
+      if (!network || agentNodeLabels.size === 0) {
+        return;
+      }
+
+      const selectedNodeIds = new Set(network.getSelectedNodes().map(String));
+      for (const [nodeId, label] of agentNodeLabels.entries()) {
+        const rect = getAgentNodeRect(nodeId);
+        if (!rect) {
+          continue;
+        }
+
+        drawAgentNode(
+          ctx,
+          rect,
+          label,
+          leaderAgentNodeIds.has(nodeId),
+          runningAgentNodeIds.has(nodeId),
+          stoppedAgentNodeIds.has(nodeId),
+          {
+            hover: hoveredNodeId === nodeId,
+            selected: selectedNodeIds.has(nodeId)
+          }
+        );
+      }
+    }
+
+    function drawRunningNodeShimmer(ctx, rect, phase, label) {
+      const x = rect.left;
+      const y = rect.top;
+      const width = rect.width;
+      const height = rect.height;
+      if (width <= 0 || height <= 0) {
+        return;
+      }
+
+      // Repaint the running node in SVG order: fill, fill shimmer, passing shimmer, border, label.
+      ctx.save();
+      roundRectPath(ctx, x, y, width, height, runningNodeShimmer.radius);
+      ctx.clip();
+
+      ctx.fillStyle = runningNodeShimmer.fill;
+      ctx.fillRect(x, y, width, height);
+
+      drawExecutionFillShimmer(ctx, x, y, width, height, phase);
+      drawExecutionPassingShimmer(ctx, x, y, width, height, phase);
+      ctx.restore();
+
+      ctx.save();
+      ctx.shadowColor = "rgba(37, 99, 235, 0.22)";
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = runningNodeShimmer.border;
+      roundRectPath(ctx, x, y, width, height, runningNodeShimmer.radius);
+      ctx.stroke();
+      ctx.restore();
+
+      if (label) {
+        drawAgentNodeLabel(ctx, rect, label, runningNodeShimmer.label);
+      }
+    }
+
+    function drawExecutionFillShimmer(ctx, x, y, width, height, phase) {
+      const scale = width / 150;
+      const offset = interpolateKeyframes(phase, -90 * scale, 20 * scale, 120 * scale);
+      const shimmerWidth = width * 2;
+      const shimmerX = x + width / 2 - width + offset;
+      const gradient = ctx.createLinearGradient(shimmerX, y, shimmerX + shimmerWidth, y);
+      gradient.addColorStop(0, "rgba(239, 246, 255, 0.20)");
+      gradient.addColorStop(0.25, "rgba(219, 234, 254, 0.55)");
+      gradient.addColorStop(0.5, "rgba(191, 219, 254, 0.75)");
+      gradient.addColorStop(0.75, "rgba(219, 234, 254, 0.55)");
+      gradient.addColorStop(1, "rgba(239, 246, 255, 0.20)");
+
+      ctx.save();
+      ctx.globalAlpha = runningNodeShimmer.fillOpacity;
+      ctx.fillStyle = gradient;
+      ctx.fillRect(shimmerX, y, shimmerWidth, height);
+      ctx.restore();
+    }
+
+    function drawExecutionPassingShimmer(ctx, x, y, width, height, phase) {
+      const scale = width / 150;
+      const offset = phase < 0.7
+        ? -190 * scale + (260 + 190) * scale * (phase / 0.7)
+        : 260 * scale;
+      const shimmerWidth = 220 * scale;
+      const shimmerX = x + width / 2 - 170 * scale + offset;
+      const gradient = ctx.createLinearGradient(shimmerX, y, shimmerX + shimmerWidth, y);
+      gradient.addColorStop(0, "rgba(239, 246, 255, 0)");
+      gradient.addColorStop(0.2, "rgba(219, 234, 254, 0.14)");
+      gradient.addColorStop(0.38, "rgba(191, 219, 254, 0.24)");
+      gradient.addColorStop(0.5, "rgba(147, 197, 253, 0.30)");
+      gradient.addColorStop(0.62, "rgba(191, 219, 254, 0.24)");
+      gradient.addColorStop(0.8, "rgba(219, 234, 254, 0.14)");
+      gradient.addColorStop(1, "rgba(239, 246, 255, 0)");
+
+      ctx.save();
+      ctx.globalAlpha = runningNodeShimmer.bandOpacity;
+      ctx.filter = `blur(${runningNodeShimmer.bandBlur}px)`;
+      ctx.fillStyle = gradient;
+      ctx.fillRect(shimmerX, y, shimmerWidth, height);
+      ctx.restore();
+    }
+
+    function interpolateKeyframes(phase, start, middle, end) {
+      if (phase <= 0.5) {
+        return start + (middle - start) * easeInOut(phase / 0.5);
+      }
+
+      return middle + (end - middle) * easeInOut((phase - 0.5) / 0.5);
+    }
+
+    function easeInOut(value) {
+      return 0.5 - Math.cos(Math.max(0, Math.min(1, value)) * Math.PI) / 2;
+    }
+
+    function getAgentNodeRect(nodeId) {
+      if (!network || !nodeId) {
+        return null;
+      }
+
+      const position = network.getPositions([nodeId])[nodeId];
+      if (!position) {
+        return null;
+      }
+
+      const style = agentNodeStyle.member;
+      return {
+        nodeId,
+        left: position.x - style.width / 2,
+        right: position.x + style.width / 2,
+        top: position.y - style.height / 2,
+        bottom: position.y + style.height / 2,
+        width: style.width,
+        height: style.height
+      };
+    }
+
+    function truncateText(text, maxLength) {
+      const str = String(text || '').trim();
+      if (str.length <= maxLength) return str;
+      return str.slice(0, maxLength - 1) + '\u2026';
+    }
+
+    function collectAgentWorkNotes(snapshot) {
+      const notesByAgentKey = new Map();
+      if (!network) {
+        return notesByAgentKey;
+      }
+
+      const tasks = Array.isArray(snapshot?.tasks) ? snapshot.tasks : [];
+      const questions = Array.isArray(snapshot?.questions) ? snapshot.questions : [];
+
+      for (const task of tasks) {
+        const agentName = String(task.assignedAgentId || '').trim();
+        if (!agentName) continue;
+
+        const status = String(task.status || '').toLowerCase();
+        if (!isActiveTaskNoteStatus(status)) continue;
+
+        addAgentWorkNoteAliases(notesByAgentKey, agentName, {
+          label: '[작업중]',
+          text: String(task.title || task.id || '').trim(),
+          color: agentWorkNoteStyle.taskColor
+        });
+      }
+
+      for (const question of questions) {
+        const agentName = String(question.targetAgentId || '').trim();
+        if (!agentName) continue;
+
+        const status = String(question.status || '').toLowerCase();
+        if (!isActiveQuestionNoteStatus(status)) continue;
+
+        addAgentWorkNoteAliases(notesByAgentKey, agentName, {
+          label: '[답변중]',
+          text: String(question.question || question.questionText || question.id || '').trim(),
+          color: agentWorkNoteStyle.questionColor
+        });
+      }
+
+      return notesByAgentKey;
+    }
+
+    function normalizeAgentKey(value) {
+      return String(value || '')
+        .trim()
+        .replace(/^agent:/i, '')
+        .replace(/^\uD83D\uDC51\s*/, '')
+        .toLowerCase();
+    }
+
+    function compactAgentKey(value) {
+      return normalizeAgentKey(value).replace(/[^a-z0-9]/g, '');
+    }
+
+    function addAgentWorkNoteAliases(notesByAgentKey, agentName, note) {
+      addAgentWorkNote(notesByAgentKey, normalizeAgentKey(agentName), note);
+      const compactKey = compactAgentKey(agentName);
+      if (compactKey && compactKey !== normalizeAgentKey(agentName)) {
+        addAgentWorkNote(notesByAgentKey, compactKey, note);
+      }
+    }
+
+    function addAgentWorkNote(notesByAgentKey, agentKey, note) {
+      if (!agentKey) {
+        return;
+      }
+
+      const notes = notesByAgentKey.get(agentKey) || [];
+      if (notes.length >= agentWorkNoteStyle.maxLines) {
+        return;
+      }
+
+      notes.push(note);
+      notesByAgentKey.set(agentKey, notes);
+    }
+
+    function isActiveTaskNoteStatus(status) {
+      const value = String(status || '').toLowerCase();
+      if (!value || value.includes('completed') || value.includes('canceled') || value.includes('failed')) {
+        return false;
+      }
+
+      return value.includes('running')
+        || value.includes('in_progress')
+        || value.includes('blocked')
+        || value.includes('runnable')
+        || value.includes('assigned')
+        || value.includes('queued')
+        || value.includes('sent')
+        || value.includes('busy_wait')
+        || value.includes('dispatched');
+    }
+
+    function isActiveQuestionNoteStatus(status) {
+      const value = String(status || '').toLowerCase();
+      return !value
+        || value.includes('open')
+        || value.includes('sent')
+        || value.includes('busy_wait')
+        || value.includes('dispatched');
+    }
+
+    function drawAgentWorkNotes(ctx) {
+      const notesByAgentKey = collectAgentWorkNotes(latestSnapshot);
+      if (notesByAgentKey.size === 0) {
+        return;
+      }
+
+      ctx.save();
+      ctx.font = agentWorkNoteStyle.font;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+
+      for (const nodeId of agentNodeLabels.keys()) {
+        const agentName = nodeId.slice("agent:".length);
+        const notes = notesByAgentKey.get(normalizeAgentKey(agentName))
+          || notesByAgentKey.get(compactAgentKey(agentName));
+        if (!notes || notes.length === 0) {
+          continue;
+        }
+
+        const rect = getAgentNodeRect(nodeId);
+        if (!rect) {
+          continue;
+        }
+
+        drawAgentWorkNoteStack(ctx, rect, notes);
+      }
+
+      ctx.restore();
+    }
+
+    function drawAgentWorkNoteStack(ctx, rect, notes) {
+      const centerX = rect.left + rect.width / 2;
+      const firstY = rect.bottom + agentWorkNoteStyle.gapFromNode + agentWorkNoteStyle.lineHeight / 2;
+
+      notes.forEach((note, index) => {
+        const y = firstY + index * agentWorkNoteStyle.lineHeight;
+        const text = fitCanvasText(ctx, `${note.label} ${note.text}`.trim(), agentWorkNoteStyle.maxWidth);
+        drawReadableCanvasText(ctx, text, centerX, y, note.color);
+      });
+    }
+
+    function drawReadableCanvasText(ctx, text, x, y, color) {
+      ctx.save();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = agentWorkNoteStyle.shadowColor;
+      ctx.strokeText(text, x, y);
+      ctx.fillStyle = color;
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function fitCanvasText(ctx, text, maxWidth) {
+      const value = String(text || '').trim();
+      if (!value) {
+        return '';
+      }
+
+      if (ctx.measureText(value).width <= maxWidth) {
+        return value;
+      }
+
+      let low = 0;
+      let high = value.length;
+      while (low < high) {
+        const mid = Math.ceil((low + high) / 2);
+        const candidate = value.slice(0, mid) + '\u2026';
+        if (ctx.measureText(candidate).width <= maxWidth) {
+          low = mid;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      return value.slice(0, Math.max(0, low)) + '\u2026';
+    }
+
+    function roundRectPath(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function getCssColor(name, fallback) {
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return value || fallback;
+    }
+
+    function bindNetworkEvents() {
+      if (!network || networkEventsBound) {
+        return;
+      }
+
+      networkEventsBound = true;
+      network.on("hoverNode", params => {
+        const nodeId = String(params.node || "");
+        hoveredNodeId = nodeId;
+        graphElement.style.cursor = nodeId.startsWith("agent:") || nodeId.startsWith("team:")
+          ? "pointer"
+          : "default";
+        requestGraphRedraw();
+      });
+      network.on("blurNode", () => {
+        hoveredNodeId = "";
+        graphElement.style.cursor = "default";
+        requestGraphRedraw();
+      });
+      network.on("afterDrawing", function(ctx) {
+        try {
+          drawAgentNodes(ctx);
+        } catch (error) {
+          console.warn("Failed to draw agent nodes.", error);
+        }
+
+        try {
+          drawAgentWorkNotes(ctx);
+        } catch (error) {
+          console.warn("Failed to draw agent work notes.", error);
+        }
+      });
+      network.on("dragEnd", function() {
+        scheduleRunningPulse();
+      });
+      network.on("zoom", function() {
+        scheduleRunningPulse();
+      });
+      network.on("animationFinished", function() {
+        scheduleRunningPulse();
+      });
+      network.on("doubleClick", params => {
+        const hasNode = Array.isArray(params.nodes) && params.nodes.length > 0;
+        const hasEdge = Array.isArray(params.edges) && params.edges.length > 0;
+        if (!hasNode && !hasEdge) {
+          resetGraphView();
+        }
+      });
+      network.on("click", params => {
+        const nodeId = Array.isArray(params.nodes) ? String(params.nodes[0] || "") : "";
+        if (nodeId.startsWith("team:")) {
+          openTeamStatusDialog(nodeId.slice("team:".length).trim());
+          return;
+        }
+
+        if (!nodeId.startsWith("agent:")) {
+          return;
+        }
+
+        const agentName = nodeId.slice("agent:".length).trim();
+        if (!agentName || !window.chrome?.webview) {
+          return;
+        }
+
+        window.chrome.webview.postMessage({
+          type: "openAgentChat",
+          agentName
+        });
+      });
+    }
+
+    function findTeam(snapshot, teamId) {
+      const teams = Array.isArray(snapshot?.teams) ? snapshot.teams : [];
+      return teams.find(team => String(team.teamId || team.name || "").trim() === teamId);
+    }
+
+    function findTeamRun(snapshot, runId) {
+      const runs = Array.isArray(snapshot?.teamRuns) ? snapshot.teamRuns : [];
+      return runs.find(run => String(run.id || "").trim() === String(runId || "").trim());
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function openTeamStatusDialog(teamId) {
+      if (!teamId) {
+        return;
+      }
+
+      selectedTeamId = teamId;
+      renderTeamStatusDialog();
+      teamDialogBackdrop.hidden = false;
+    }
+
+    function closeTeamStatusDialog() {
+      teamDialogBackdrop.hidden = true;
+      selectedTeamId = "";
+    }
+
+    function renderTeamStatusDialog() {
+      const team = findTeam(latestSnapshot, selectedTeamId);
+      if (!team) {
+        teamDialogName.textContent = "Team not found";
+        teamDialogSubtitle.textContent = `Frozen at ${new Date().toLocaleTimeString()}`;
+        teamDialogBody.innerHTML = "<p>The selected team is not present in the latest FleetManager snapshot.</p>";
+        return;
+      }
+
+      const teamName = team.name || team.teamId || selectedTeamId;
+      const run = findTeamRun(latestSnapshot, team.currentRunId);
+      const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+      teamDialogName.textContent = teamName;
+      teamDialogSubtitle.textContent = `Frozen at ${new Date().toLocaleTimeString()}`;
+      teamDialogBody.innerHTML = `
+        <div class="status-grid">
+          <div class="status-item"><span>Status</span><strong>${escapeHtml(team.status || "idle")}</strong></div>
+          <div class="status-item"><span>Current Run</span><strong>${escapeHtml(team.currentRunId || "(none)")}</strong></div>
+          <div class="status-item"><span>Leader</span><strong>${escapeHtml(team.leaderAgentId || "(none)")}</strong></div>
+          <div class="status-item"><span>Members</span><strong>${members.length}</strong></div>
+        </div>
+        <button id="team-details-toggle" class="details-toggle" type="button" aria-expanded="false">Show details</button>
+        <div id="team-details" class="team-details" hidden>
+          <h3>Description</h3>
+          <div>${escapeHtml(team.description || "No description.")}</div>
+          <h3>Run Summary</h3>
+          <div>
+            <div><strong>ID:</strong> ${escapeHtml(run?.id || team.currentRunId || "(none)")}</div>
+            <div><strong>Title:</strong> ${escapeHtml(run?.title || "(not available)")}</div>
+            <div><strong>Mode:</strong> ${escapeHtml(run?.mode || "(not available)")}</div>
+            <div><strong>Status:</strong> ${escapeHtml(run?.status || team.status || "(not available)")}</div>
+          </div>
+          <h3>Members</h3>
+          <ul>${members.map(member => `<li>${escapeHtml(member)}</li>`).join("") || "<li>No members.</li>"}</ul>
+        </div>`;
+
+      const toggle = document.getElementById("team-details-toggle");
+      const details = document.getElementById("team-details");
+      toggle.addEventListener("click", () => {
+        const nextExpanded = details.hidden;
+        details.hidden = !nextExpanded;
+        toggle.setAttribute("aria-expanded", String(nextExpanded));
+        toggle.textContent = nextExpanded ? "Hide details" : "Show details";
+      });
+    }
+
+    teamDialogRefresh.addEventListener("click", () => {
+      renderTeamStatusDialog();
+    });
+    teamDialogClose.addEventListener("click", closeTeamStatusDialog);
+    teamDialogBackdrop.addEventListener("click", event => {
+      if (event.target === teamDialogBackdrop) {
+        closeTeamStatusDialog();
+      }
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !teamDialogBackdrop.hidden) {
+        closeTeamStatusDialog();
+      }
+    });
+
+    if (window.chrome?.webview) {
+      window.chrome.webview.addEventListener("message", event => render(event.data));
+    } else {
+      render({
+        teams: [
+          {
+            teamId: "sample-team",
+            name: "Sample Team",
+            description: "Local fallback preview",
+            leaderAgentId: "LeaderAgent",
+            status: "running",
+            currentRunId: "sample-run",
+            memberAgentIds: ["LeaderAgent", "WorkerAgent", "SharedAgent"]
+          },
+          {
+            teamId: "review-team",
+            name: "Review Team",
+            description: "Shared member preview",
+            leaderAgentId: "SharedAgent",
+            status: "idle",
+            currentRunId: "(none)",
+            memberAgentIds: ["SharedAgent", "ReviewerAgent"]
+          }
+        ],
+        agents: [
+          { agentName: "LeaderAgent", status: "running", description: "Team leader", teamCount: 1 },
+          { agentName: "WorkerAgent", status: "idle", description: "Worker", teamCount: 1 },
+          { agentName: "SharedAgent", status: "busy", description: "Shared leader/member", teamCount: 2 },
+          { agentName: "ReviewerAgent", status: "Not configured", description: "Missing agent settings", teamCount: 1 }
+        ],
+        teamRuns: []
+      });
+    }
+  </script>
+</body>
+</html>
+
+
+

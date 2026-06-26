@@ -1,0 +1,12 @@
+[
+  "--control-only",
+  "--control-url",
+  "http://localhost:50001",
+  "--plain",
+  "--agent-name",
+  "TaskDecomposer",
+  "--agent-role",
+  "TaskDecomposer",
+  "--activate-mcp-server",
+  "playwright-mcp-python"
+]

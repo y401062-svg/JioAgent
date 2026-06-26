@@ -1,0 +1,6 @@
+﻿logs/
+TeamRuntimeStore/
+AgentSettings/*.conversation.json
+*.log
+__pycache__/
+*.pyc

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "filesystem-mcp-python": {
+      "command": "python",
+      "args": [
+        "-m",
+        "filesystem_mcp",
+        "D:\\allowed\\workspace"
+      ],
+      "cwd": "D:\\src\\MCP\\filesystem-mcp-main\\filesystem-mcp-main\\release\\python-filesystem-mcp"
+    }
+  }
+}

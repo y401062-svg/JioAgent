@@ -1,0 +1,15 @@
+{
+  "teamId": "12kj3213",
+  "name": "\uCD1D\uAD04",
+  "description": "\uCD1D\uAD04",
+  "leaderAgentId": "\uCD1D\uAD04\uC7A5",
+  "maxTaskCount": 50,
+  "maxTrashTaskCount": 200,
+  "maxQuestionCount": 20,
+  "memberAgentIds": [
+    "CodingTeamLeader",
+    "\uC0DD\uC0B0\uD300\uC7A5",
+    "\uC778\uC0AC\uD300\uC7A5",
+    "\uCD1D\uAD04\uC7A5"
+  ]
+}

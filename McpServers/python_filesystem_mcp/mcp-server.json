@@ -1,0 +1,22 @@
+﻿{
+    "id":  "python-filesystem-mcp",
+    "name":  "Python Filesystem MCP",
+    "description":  "Secure filesystem MCP server for reading, writing, searching, diffing, and patching files. Python implementation with 18 tools.",
+    "transport":  "stdio",
+    "command":  "python",
+    "args":  [
+                 "-m",
+                 "filesystem_mcp",
+                 "D:\\"
+             ],
+    "env":  {
+
+            },
+    "workingDirectory":  ".",
+    "stdioTimeoutSeconds":  10,
+    "tags":  [
+                 "python",
+                 "stdio",
+                 "filesystem"
+             ]
+}

@@ -1,0 +1,1248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Team Runtime Graph</title>
+  <script src="./vis-network.min.js"></script>
+  <style>
+    /* Root CSS Custom Properties */
+    :root {
+      --text: #111827;
+      --muted: #6b7280;
+      --panel: #ffffff;
+      --line: #d1d5db;
+      --soft: #f3f4f6;
+      --blue: #2563eb;
+      --bubble-task-bg: #1e40af;
+      --bubble-question-bg: #92400e;
+      --bubble-text: #ffffff;
+      --bubble-font-size: 11px;
+      --bubble-radius: 10px;
+      --bubble-max-width: 200px;
+      --bubble-padding: 4px 8px
+    }
+
+    html,
+    body,
+    #graph {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f8fafc;
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    /* Layout & Shell */
+    .shell {
+      box-sizing: border-box;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      width: 100%;
+      height: 100%;
+      gap: 10px;
+      padding: 14px;
+    }
+
+    /* Toolbar & Legend */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 38px;
+    }
+
+    .title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .title strong {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .title span {
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    /* Canvas & Empty State */
+      box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.12);
+    }
+
+    .canvas-wrap {
+      position: relative;
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    #graph {
+      position: absolute;
+      inset: 0;
+    }
+
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-sizing: border-box;
+      padding: 28px;
+      color: var(--muted);
+      font-size: 13px;
+      background: var(--panel);
+      text-align: center;
+    }
+
+    .empty strong {
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .empty code {
+      display: block;
+      max-width: min(760px, 90vw);
+      overflow: hidden;
+      color: #374151;
+      font-family: Consolas, "Courier New", monospace;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty[hidden] {
+    /* Dialog */
+      display: none;
+    }
+
+    .dialog-backdrop {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.22);
+      z-index: 10;
+    }
+
+    .dialog-backdrop[hidden] {
+      display: none;
+    }
+
+    .team-dialog {
+      width: min(560px, calc(100vw - 48px));
+      max-height: min(680px, calc(100vh - 48px));
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+    }
+
+    .team-dialog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .team-dialog-title {
+      min-width: 0;
+    }
+
+    .team-dialog-title strong,
+    .team-dialog-title span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .team-dialog-title strong {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .team-dialog-title span {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .team-dialog-actions {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-button {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #374151;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .icon-button:hover {
+      border-color: #94a3b8;
+      background: #f8fafc;
+    }
+
+    .team-dialog-body {
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .status-item {
+      min-width: 0;
+    }
+
+    .status-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .status-item strong {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .details-toggle {
+      width: 100%;
+      margin-top: 16px;
+      padding: 9px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #f8fafc;
+      color: #111827;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .details-toggle:hover {
+      border-color: #94a3b8;
+      background: #f1f5f9;
+    }
+
+    .team-details {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+      color: #374151;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .team-details[hidden] {
+      display: none;
+    }
+
+    .team-details h3 {
+      margin: 12px 0 6px;
+      color: #111827;
+      font-size: 13px;
+    }
+
+    .team-details h3:first-child {
+      margin-top: 0;
+    }
+
+    .team-details ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+    }
+
+    .team-details li {
+      margin: 3px 0;
+    /* Dark Mode Overrides */
+    }
+  
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bubble-task-bg: #1e3a5f;
+        --bubble-question-bg: #5c4a1e;
+      }
+    }
+      
+    /* Speech Bubble Layer */
+    #speech-bubble-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #speech-bubble-layer[hidden] {
+      display: none;
+    }
+
+    .speech-bubble {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: var(--bubble-padding);
+      border-radius: var(--bubble-radius);
+      color: var(--bubble-text);
+      font-size: var(--bubble-font-size);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.3;
+      max-width: var(--bubble-max-width);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      user-select: none;
+      z-index: 5;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+    }
+
+    .speech-bubble--task {
+      background: var(--bubble-task-bg);
+    }
+
+    .speech-bubble--question {
+      background: var(--bubble-question-bg);
+    }
+
+    /* Bubble tail */
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 0;
+      border: 5px solid transparent;
+    }
+
+    .speech-bubble--task::after {
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-top-color: var(--bubble-task-bg);
+    }
+
+    .speech-bubble--question::after {
+      left: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      border-right-color: var(--bubble-question-bg);
+    }
+
+    .bubble-icon {
+      flex-shrink: 0;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .bubble-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="toolbar">
+      <div class="title">
+        <strong>Team Runtime Graph</strong>
+        <span id="summary">Waiting for FleetManager data...</span>
+      </div>
+      <div class="legend" aria-label="Status legend">
+        <span class="legend-item"><i class="dot" style="background:#e5e7eb"></i>Idle</span>
+        <span class="legend-item"><i class="dot" style="background:#bfdbfe"></i>Running</span>
+        <span class="legend-item"><i class="dot" style="background:#fef3c7"></i>Waiting</span>
+        <span class="legend-item"><i class="dot" style="background:#fee2e2"></i>Issue</span>
+      </div>
+    </header>
+    <section class="canvas-wrap">
+      <div id="graph"></div>
+      <div id="empty" class="empty" hidden>
+        <strong>No teams configured.</strong>
+        <span id="empty-detail">Waiting for diagnostics...</span>
+      </div>
+      <div id="speech-bubble-layer"></div>
+      <div id="team-dialog-backdrop" class="dialog-backdrop" hidden>
+        <section class="team-dialog" role="dialog" aria-modal="true" aria-labelledby="team-dialog-name">
+          <header class="team-dialog-header">
+            <div class="team-dialog-title">
+              <strong id="team-dialog-name">Team Status</strong>
+              <span id="team-dialog-subtitle">Frozen at click time</span>
+            </div>
+            <div class="team-dialog-actions">
+              <button id="team-dialog-refresh" class="icon-button" type="button" title="Refresh">↻</button>
+              <button id="team-dialog-close" class="icon-button" type="button" title="Close">×</button>
+            </div>
+          </header>
+          <div id="team-dialog-body" class="team-dialog-body"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const graphElement = document.getElementById("graph");
+    const summaryElement = document.getElementById("summary");
+    const emptyElement = document.getElementById("empty");
+    const emptyDetailElement = document.getElementById("empty-detail");
+    const teamDialogBackdrop = document.getElementById("team-dialog-backdrop");
+    const teamDialogName = document.getElementById("team-dialog-name");
+    const teamDialogSubtitle = document.getElementById("team-dialog-subtitle");
+    const teamDialogBody = document.getElementById("team-dialog-body");
+    const teamDialogRefresh = document.getElementById("team-dialog-refresh");
+    const teamDialogClose = document.getElementById("team-dialog-close");
+    let network;
+    let networkEventsBound = false;
+    let latestSnapshot;
+    let selectedTeamId = "";
+    let runningAgentNodeIds = new Set();
+    let runningPulseFrame = 0;
+    let bubbleUpdateFrame = null;
+    function scheduleBubbleUpdate() {
+      if (bubbleUpdateFrame) return;
+      bubbleUpdateFrame = requestAnimationFrame(function() {
+        bubbleUpdateFrame = null;
+        updateSpeechBubbles(latestSnapshot);
+      });
+    }
+    function statusColor(status) {
+      const value = String(status || "").toLowerCase();
+      if (value.includes("stopped")) {
+        return { background: "#fecaca", border: "#991b1b", foreground: "#7f1d1d" };
+      }
+      if (!value || value.includes("idle") || value.includes("none")) {
+        return { background: "#e5e7eb", border: "#9ca3af", foreground: "#374151" };
+      }
+      if (value.includes("busy") || value.includes("running") || value.includes("started")) {
+        return { background: "#bfdbfe", border: "#1d4ed8", foreground: "#1e3a8a" };
+      }
+      if (value.includes("fail") || value.includes("error") || value.includes("missing") || value.includes("not configured")) {
+        return { background: "#fee2e2", border: "#dc2626", foreground: "#991b1b" };
+      }
+      if (value.includes("wait") || value.includes("question") || value.includes("warning") || value.includes("unavailable")) {
+        return { background: "#fef3c7", border: "#d97706", foreground: "#92400e" };
+      }
+      return { background: "#e5e7eb", border: "#9ca3af", foreground: "#374151" };
+    }
+
+    function shortText(value, length) {
+      const text = String(value || "").trim();
+      if (text.length <= length) {
+        return text;
+      }
+      return `${text.slice(0, length - 1)}...`;
+    }
+
+    function isRunningStatus(status) {
+      const value = String(status || "").toLowerCase();
+      return value.includes("busy") || value.includes("running") || value.includes("started");
+    }
+
+    function teamTone(index) {
+      const tones = [
+        { line: "#2563eb", highlight: "#1d4ed8", label: "#1e3a8a" },
+        { line: "#059669", highlight: "#047857", label: "#065f46" },
+        { line: "#7c3aed", highlight: "#6d28d9", label: "#5b21b6" },
+        { line: "#ea580c", highlight: "#c2410c", label: "#9a3412" },
+        { line: "#0891b2", highlight: "#0e7490", label: "#155e75" },
+        { line: "#be123c", highlight: "#9f1239", label: "#881337" },
+        { line: "#4f46e5", highlight: "#4338ca", label: "#3730a3" },
+        { line: "#65a30d", highlight: "#4d7c0f", label: "#365314" }
+      ];
+      return tones[index % tones.length];
+    }
+
+    function render(snapshot) {
+      latestSnapshot = snapshot;
+      const teams = Array.isArray(snapshot?.teams) ? snapshot.teams : [];
+      const agents = Array.isArray(snapshot?.agents) ? snapshot.agents : [];
+      const diagnostics = snapshot?.diagnostics || {};
+      const agentByName = new Map(agents.map(agent => [String(agent.agentName || "").toLowerCase(), agent]));
+      const leaderNames = new Set(teams
+        .map(team => String(team.leaderAgentId || "").trim().toLowerCase())
+        .filter(Boolean));
+      const nextRunningAgentNodeIds = new Set();
+      const nodes = [];
+      const edges = [];
+      const teamToneById = new Map();
+      teams.forEach((team, index) => {
+        const teamId = String(team.teamId || team.name || "").trim();
+        if (teamId) {
+          teamToneById.set(teamId.toLowerCase(), teamTone(index));
+        }
+      });
+
+      for (const team of teams) {
+        const teamId = String(team.teamId || team.name || "").trim();
+        if (!teamId) {
+          continue;
+        }
+
+        const status = team.status || "idle";
+        const colors = statusColor(status);
+        const tone = teamToneById.get(teamId.toLowerCase()) || teamTone(0);
+        nodes.push({
+          id: `team:${teamId}`,
+          label: `${team.name || teamId}`,
+          title: `${team.name || teamId}\n${team.description || ""}\nRun: ${team.currentRunId || "(none)"}`,
+          shape: "box",
+          margin: 12,
+          widthConstraint: { minimum: 150, maximum: 230 },
+          color: {
+            background: "#ffffff",
+            border: tone.line,
+            highlight: { background: "#ffffff", border: tone.highlight }
+          },
+          font: { color: "#111827", size: 14, face: "Segoe UI", multi: true },
+          borderWidth: 3,
+          shadow: { enabled: true, color: "rgba(15,23,42,0.12)", size: 8, x: 0, y: 2 },
+          level: 0
+        });
+
+        const leaderName = String(team.leaderAgentId || "").trim();
+        const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+        for (const rawMember of members) {
+          const memberName = String(rawMember || "").trim();
+          if (!memberName) {
+            continue;
+          }
+
+          const isLeader = leaderName && memberName.toLowerCase() === leaderName.toLowerCase();
+          edges.push({
+            from: `team:${teamId}`,
+            to: `agent:${memberName}`,
+            label: isLeader ? "leader" : "",
+            color: { color: tone.line, highlight: tone.highlight },
+            dashes: !isLeader,
+            width: isLeader ? 3 : 1.8,
+            arrows: { to: { enabled: false } },
+            font: { size: isLeader ? 13 : 11, color: tone.label, strokeWidth: 4, strokeColor: "#ffffff" },
+            smooth: {
+              type: isLeader ? "curvedCW" : "curvedCCW",
+              roundness: isLeader ? 0.1 : 0.14
+            }
+          });
+        }
+      }
+
+      for (const agent of agents) {
+        const agentName = String(agent.agentName || "").trim();
+        if (!agentName) {
+          continue;
+        }
+
+        const status = agent.status || "Not configured";
+        const colors = statusColor(status);
+        const shared = Number(agent.teamCount || 0) > 1 ? `\n${agent.teamCount} teams` : "";
+        const isLeaderAgent = leaderNames.has(agentName.toLowerCase());
+        const nodeId = `agent:${agentName}`;
+        if (isRunningStatus(status)) {
+          nextRunningAgentNodeIds.add(nodeId);
+        }
+        nodes.push({
+          id: nodeId,
+          label: `${agentName}${shared}\n${shortText(status, 24)}`,
+          title: `${agentName}\n${agent.description || ""}\nStatus: ${status}`,
+          shape: "dot",
+          size: Number(agent.teamCount || 0) > 1 ? 22 : 18,
+          color: {
+            background: colors.background,
+            border: isLeaderAgent ? "#111827" : colors.border,
+            highlight: { background: colors.background, border: isLeaderAgent ? "#111827" : "#2563eb" }
+          },
+          font: { color: isLeaderAgent ? "#111827" : colors.foreground, size: 13, face: "Segoe UI", multi: true },
+          borderWidth: isLeaderAgent ? 4 : Number(agent.teamCount || 0) > 1 ? 3 : 2,
+          level: 1
+        });
+      }
+
+      for (const team of teams) {
+        const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+        for (const rawMember of members) {
+          const memberName = String(rawMember || "").trim();
+          if (memberName && !agentByName.has(memberName.toLowerCase())) {
+            const colors = statusColor("Not configured");
+            const isLeaderAgent = leaderNames.has(memberName.toLowerCase());
+            nodes.push({
+              id: `agent:${memberName}`,
+              label: `${memberName}\nNot configured`,
+              shape: "dot",
+              size: 18,
+              color: { background: colors.background, border: isLeaderAgent ? "#111827" : colors.border },
+              font: { color: isLeaderAgent ? "#111827" : colors.foreground, size: 13, face: "Segoe UI", multi: true },
+              borderWidth: isLeaderAgent ? 4 : 2,
+              level: 1
+            });
+          }
+        }
+      }
+
+      emptyElement.hidden = nodes.length > 0;
+      runningAgentNodeIds = nextRunningAgentNodeIds;
+      summaryElement.textContent = `${teams.length} teams, ${agents.length} agents, TeamSettings files ${diagnostics.teamSettingsFileCount ?? "?"}, updated ${new Date().toLocaleTimeString()}`;
+      emptyDetailElement.innerHTML = [
+        `Snapshot teams: ${diagnostics.snapshotTeamCount ?? teams.length}`,
+        `Visual teams: ${diagnostics.visualTeamCount ?? "?"}`,
+        `TeamSettings files: ${diagnostics.teamSettingsFileCount ?? "?"}`,
+        `<code>${diagnostics.teamSettingsDirectory || "TeamSettings directory unknown"}</code>`,
+        `<code>${diagnostics.appBaseDirectory || "Base directory unknown"}</code>`
+      ].join("<br>");
+
+      const previousPositions = network ? network.getPositions() : {};
+      const previousView = network
+        ? {
+            position: network.getViewPosition(),
+            scale: network.getScale()
+          }
+        : null;
+      for (const node of nodes) {
+        const position = previousPositions[node.id];
+        if (position) {
+          node.x = position.x;
+          node.y = position.y;
+        }
+      }
+      const useWideInitialLayout = assignWideInitialPositions(nodes, teams, previousPositions);
+
+      const data = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges)
+      };
+      const options = {
+        autoResize: true,
+        interaction: {
+          hover: true,
+          multiselect: false,
+          navigationButtons: true,
+          tooltipDelay: 250
+        },
+        layout: {
+          improvedLayout: true
+        },
+        physics: {
+          enabled: !useWideInitialLayout,
+          stabilization: { iterations: 160, updateInterval: 20 },
+          barnesHut: {
+            gravitationalConstant: -7200,
+            centralGravity: 0.18,
+            springLength: 150,
+            springConstant: 0.035,
+            damping: 0.24,
+            avoidOverlap: 0.55
+          }
+        },
+        edges: {
+          smooth: { type: "curvedCW", roundness: 0.12 }
+        }
+      };
+
+      if (!network) {
+        network = new vis.Network(graphElement, data, options);
+        bindNetworkEvents();
+        if (useWideInitialLayout) {
+          network.fit({ animation: true });
+          network.setOptions({ physics: { enabled: false } });
+          scheduleRunningPulse();
+          updateSpeechBubbles(snapshot);
+          return;
+        }
+
+        network.once("stabilized", () => {
+          network.fit({ animation: true });
+          network.setOptions({ physics: { enabled: false } });
+          scheduleRunningPulse();
+          updateSpeechBubbles(snapshot);
+        });
+        return;
+      }
+
+      const hasNewNodes = nodes.some(node => !previousPositions[node.id]);
+      if (hasNewNodes) {
+        network.setData(data);
+        network.setOptions(options);
+        if (useWideInitialLayout) {
+          network.setOptions({ physics: { enabled: false } });
+          restoreView(previousView);
+          scheduleRunningPulse();
+          updateSpeechBubbles(snapshot);
+          return;
+        }
+
+        network.once("stabilized", () => {
+          network.setOptions({ physics: { enabled: false } });
+          restoreView(previousView);
+          scheduleRunningPulse();
+          updateSpeechBubbles(snapshot);
+        });
+        return;
+      }
+
+      network.setOptions({ ...options, physics: { enabled: false } });
+      network.setData(data);
+      restoreView(previousView);
+      scheduleRunningPulse();
+      updateSpeechBubbles(snapshot);
+    }
+
+    function assignWideInitialPositions(nodes, teams, previousPositions) {
+      const bounds = graphElement.getBoundingClientRect();
+      if (bounds.width < bounds.height * 1.15) {
+        return false;
+      }
+
+      const teamIds = teams
+        .map(team => String(team.teamId || team.name || "").trim())
+        .filter(Boolean);
+      if (teamIds.length === 0) {
+        return false;
+      }
+
+      const positions = new Map();
+      const teamY = new Map();
+      const teamSpacing = Math.max(150, Math.min(230, bounds.height / Math.max(1, teamIds.length)));
+      const teamStartY = -((teamIds.length - 1) * teamSpacing) / 2;
+      teamIds.forEach((teamId, index) => {
+        const y = teamStartY + index * teamSpacing;
+        teamY.set(teamId.toLowerCase(), y);
+        positions.set(`team:${teamId}`, { x: -160, y });
+      });
+
+      const leaderY = new Map();
+      const memberNames = new Set();
+      const memberY = new Map();
+      const allLeaderNames = new Set(teams
+        .map(team => String(team.leaderAgentId || "").trim().toLowerCase())
+        .filter(Boolean));
+      for (const team of teams) {
+        const teamId = String(team.teamId || team.name || "").trim();
+        const y = teamY.get(teamId.toLowerCase()) ?? 0;
+        const leaderName = String(team.leaderAgentId || "").trim();
+        if (leaderName) {
+          const key = leaderName.toLowerCase();
+          const values = leaderY.get(key) || [];
+          values.push(y);
+          leaderY.set(key, values);
+        }
+
+        const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+        for (const rawMember of members) {
+          const memberName = String(rawMember || "").trim();
+          if (!memberName) {
+            continue;
+          }
+
+          if (!allLeaderNames.has(memberName.toLowerCase())) {
+            const key = memberName.toLowerCase();
+            const values = memberY.get(key) || [];
+            values.push(y);
+            memberY.set(key, values);
+            memberNames.add(memberName);
+          }
+        }
+      }
+
+      for (const [leaderName, values] of leaderY.entries()) {
+        const averageY = values.reduce((sum, value) => sum + value, 0) / values.length;
+        positions.set(`agent:${leaderName}`, { x: -470, y: averageY });
+      }
+
+      const sortedMembers = Array.from(memberNames).sort((left, right) => {
+        const leftValues = memberY.get(left.toLowerCase()) || [0];
+        const rightValues = memberY.get(right.toLowerCase()) || [0];
+        const leftY = leftValues.reduce((sum, value) => sum + value, 0) / leftValues.length;
+        const rightY = rightValues.reduce((sum, value) => sum + value, 0) / rightValues.length;
+        return leftY === rightY
+          ? left.localeCompare(right, undefined, { sensitivity: "base" })
+          : leftY - rightY;
+      });
+      const columns = sortedMembers.length > 8 ? 2 : 1;
+      const rows = Math.max(1, Math.ceil(sortedMembers.length / columns));
+      const memberSpacing = Math.max(78, Math.min(112, bounds.height / Math.max(4, rows)));
+      const memberStartY = -((rows - 1) * memberSpacing) / 2;
+      sortedMembers.forEach((memberName, index) => {
+        const row = Math.floor(index / columns);
+        const column = index % columns;
+        positions.set(`agent:${memberName.toLowerCase()}`, {
+          x: 260 + column * 230,
+          y: memberStartY + row * memberSpacing
+        });
+      });
+
+      let applied = false;
+      for (const node of nodes) {
+        if (previousPositions[node.id]) {
+          continue;
+        }
+
+        const position = positions.get(node.id) || positions.get(String(node.id).toLowerCase());
+        if (!position) {
+          continue;
+        }
+
+        node.x = position.x;
+        node.y = position.y;
+        applied = true;
+      }
+
+      return applied;
+    }
+
+    function restoreView(view) {
+      if (!network || !view) {
+        return;
+      }
+
+      network.moveTo({
+        position: view.position,
+        scale: view.scale,
+        animation: false
+      });
+    }
+
+    function scheduleRunningPulse() {
+      if (runningPulseFrame || !network || runningAgentNodeIds.size === 0) {
+        return;
+      }
+
+      const tick = () => {
+        runningPulseFrame = 0;
+        if (!network || runningAgentNodeIds.size === 0) {
+          return;
+        }
+
+        network.redraw();
+        runningPulseFrame = requestAnimationFrame(tick);
+      };
+
+      runningPulseFrame = requestAnimationFrame(tick);
+    }
+
+        function drawRunningPulse(ctx) {
+      if (!network || runningAgentNodeIds.size === 0) {
+        return;
+      }
+
+      const elapsed = (performance.now() % 1400) / 1400;
+      const radius = 26 + elapsed * 14;
+      const opacity = 0.5 * (1 - elapsed);
+      const positions = network.getPositions(Array.from(runningAgentNodeIds));
+
+      ctx.save();
+      for (const nodeId of runningAgentNodeIds) {
+        const position = positions[nodeId];
+        if (!position) {
+          continue;
+        }
+
+        ctx.beginPath();
+        ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = `rgba(29, 78, 216, ${opacity})`;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function canvasToScreen(canvasPos) {
+      if (!network || !canvasPos) return null;
+      try {
+        return network.canvasToDOM(canvasPos);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function truncateText(text, maxLength) {
+      const str = String(text || '').trim();
+      if (str.length <= maxLength) return str;
+      return str.slice(0, maxLength - 1) + '\u2026';
+    }
+
+    function getTaskIcon(status) {
+      const s = String(status || '').toLowerCase();
+      if (s.includes('running') || s.includes('in_progress')) return '\uD83D\uDD27';
+      if (s.includes('blocked')) return '\uD83D\uDEA7';
+      if (s.includes('runnable') || s.includes('dispatched')) return '\u26A1';
+      if (s.includes('completed')) return '\u2705';
+      if (s.includes('failed')) return '\u274C';
+      if (s.includes('canceled')) return '\uD83D\uDEAB';
+      if (s.includes('draft')) return '\uD83D\uDCC4';
+      return '\uD83D\uDCCB';
+    }
+
+    function getQuestionIcon(status) {
+      const s = String(status || '').toLowerCase();
+      if (s.includes('answered')) return '\uD83D\uDCAC';
+      if (s.includes('canceled')) return '\uD83D\uDDD1\uFE0F';
+      if (s.includes('failed')) return '\u26A0\uFE0F';
+      return '\u2753';
+    }
+
+    function createOrUpdateBubble(layer, bubbleId, className, icon, text) {
+      let bubble = layer.querySelector('[data-bubble-id="' + bubbleId + '"]');
+      if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.className = 'speech-bubble ' + className;
+        bubble.dataset.bubbleId = bubbleId;
+        bubble.innerHTML = '<span class="bubble-icon">' + icon + '</span><span class="bubble-text">' + escapeHtml(text) + '</span>';
+        layer.appendChild(bubble);
+      } else {
+        bubble.querySelector('.bubble-icon').textContent = icon;
+        bubble.querySelector('.bubble-text').textContent = text;
+      }
+      return bubble;
+    }
+
+    function updateSpeechBubbles(snapshot) {
+      const layer = document.getElementById('speech-bubble-layer');
+      if (!layer || !network) {
+        if (layer) layer.hidden = true;
+        return;
+      }
+
+      const tasks = Array.isArray(snapshot?.tasks) ? snapshot.tasks : [];
+      const questions = Array.isArray(snapshot?.questions) ? snapshot.questions : [];
+
+      if (tasks.length === 0 && questions.length === 0) {
+        layer.hidden = true;
+        const existing = layer.querySelectorAll('.speech-bubble');
+        for (const el of existing) el.remove();
+        return;
+      }
+
+      const scale = network.getScale();
+      const invScale = 1 / Math.max(scale, 0.1);
+      const activeBubbleIds = new Set();
+
+      // Process Task bubbles
+      for (const task of tasks) {
+        const agentName = String(task.assignedAgentId || '').trim();
+        if (!agentName) continue;
+
+        const status = String(task.status || '').toLowerCase();
+        const showTask = status.includes('running') || status.includes('blocked') || status.includes('runnable');
+        if (!showTask) continue;
+
+        const nodeId = 'agent:' + agentName;
+        const bbox = network.getBoundingBox(nodeId);
+        if (!bbox) continue;
+
+        const canvasCenterX = (bbox.left + bbox.right) / 2;
+        const targetDom = canvasToScreen({x: canvasCenterX, y: bbox.top - 8});
+        if (!targetDom) continue;
+
+        const bubbleId = nodeId + ':task';
+        activeBubbleIds.add(bubbleId);
+
+        const bubble = createOrUpdateBubble(layer, bubbleId, 'speech-bubble--task', getTaskIcon(status), truncateText(task.title, 40));
+        bubble.dataset.agentId = agentName;
+        bubble.dataset.bubbleType = 'task';
+
+        // Position: bottom-center at node top-center with gap
+        const bubbleHeight = 28;
+        bubble.style.left = (targetDom.x - 100 * invScale) + 'px';
+        bubble.style.top = (targetDom.y - bubbleHeight * invScale) + 'px';
+        bubble.style.transform = 'scale(' + invScale + ')';
+        bubble.style.transformOrigin = 'bottom center';
+      }
+
+      // Process Question bubbles
+      for (const question of questions) {
+        const agentName = String(question.targetAgentId || '').trim();
+        if (!agentName) continue;
+
+        const qStatus = String(question.status || '').toLowerCase();
+        if (qStatus !== 'open') continue;
+
+        const nodeId = 'agent:' + agentName;
+        const bbox = network.getBoundingBox(nodeId);
+        if (!bbox) continue;
+
+        const canvasNodeRight = bbox.right;
+        const canvasCenterY = (bbox.top + bbox.bottom) / 2;
+        const targetDom = canvasToScreen({x: canvasNodeRight + 8, y: canvasCenterY});
+        if (!targetDom) continue;
+
+        const bubbleId = nodeId + ':question';
+        activeBubbleIds.add(bubbleId);
+
+        const bubble = createOrUpdateBubble(layer, bubbleId, 'speech-bubble--question', getQuestionIcon('open'), truncateText(question.question || question.questionText || '', 40));
+        bubble.dataset.agentId = agentName;
+        bubble.dataset.bubbleType = 'question';
+
+        // Position: left-center at node right-center with gap
+        const bubbleHeight = 28;
+        bubble.style.left = targetDom.x + 'px';
+        bubble.style.top = (targetDom.y - bubbleHeight / 2 * invScale) + 'px';
+        bubble.style.transform = 'scale(' + invScale + ')';
+        bubble.style.transformOrigin = 'left center';
+      }
+
+      // Remove stale bubbles
+      const existing = layer.querySelectorAll('.speech-bubble');
+      for (const el of existing) {
+        if (!activeBubbleIds.has(el.dataset.bubbleId)) {
+          el.remove();
+        }
+      }
+
+      layer.hidden = activeBubbleIds.size === 0;
+    }function bindNetworkEvents() {
+      if (!network || networkEventsBound) {
+        return;
+      }
+
+      networkEventsBound = true;
+      network.on("hoverNode", params => {
+        const nodeId = String(params.node || "");
+        graphElement.style.cursor = nodeId.startsWith("agent:") || nodeId.startsWith("team:")
+          ? "pointer"
+          : "default";
+      });
+      network.on("blurNode", () => {
+        graphElement.style.cursor = "default";
+      });
+            network.on("afterDrawing", function(ctx) {
+        drawRunningPulse(ctx);
+      });
+                  network.on("dragging", function() {
+        scheduleBubbleUpdate();
+      });
+            network.on("dragEnd", function() {
+        scheduleRunningPulse();
+        updateSpeechBubbles(latestSnapshot);
+      });
+            let zoomTimer;
+      network.on("zoom", function() {
+        clearTimeout(zoomTimer);
+        zoomTimer = setTimeout(function() {
+          scheduleRunningPulse();
+          updateSpeechBubbles(latestSnapshot);
+        }, 50);
+      });
+            network.on("animationFinished", function() {
+        scheduleRunningPulse();
+        updateSpeechBubbles(latestSnapshot);
+      });
+      network.on("click", params => {
+        const nodeId = Array.isArray(params.nodes) ? String(params.nodes[0] || "") : "";
+        if (nodeId.startsWith("team:")) {
+          openTeamStatusDialog(nodeId.slice("team:".length).trim());
+          return;
+        }
+
+        if (!nodeId.startsWith("agent:")) {
+          return;
+        }
+
+        const agentName = nodeId.slice("agent:".length).trim();
+        if (!agentName || !window.chrome?.webview) {
+          return;
+        }
+
+        window.chrome.webview.postMessage({
+          type: "openAgentChat",
+          agentName
+        });
+      });
+    }
+
+    function findTeam(snapshot, teamId) {
+      const teams = Array.isArray(snapshot?.teams) ? snapshot.teams : [];
+      return teams.find(team => String(team.teamId || team.name || "").trim() === teamId);
+    }
+
+    function findTeamRun(snapshot, runId) {
+      const runs = Array.isArray(snapshot?.teamRuns) ? snapshot.teamRuns : [];
+      return runs.find(run => String(run.id || "").trim() === String(runId || "").trim());
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function openTeamStatusDialog(teamId) {
+      if (!teamId) {
+        return;
+      }
+
+      selectedTeamId = teamId;
+      renderTeamStatusDialog();
+      teamDialogBackdrop.hidden = false;
+    }
+
+    function closeTeamStatusDialog() {
+      teamDialogBackdrop.hidden = true;
+      selectedTeamId = "";
+    }
+
+    function renderTeamStatusDialog() {
+      const team = findTeam(latestSnapshot, selectedTeamId);
+      if (!team) {
+        teamDialogName.textContent = "Team not found";
+        teamDialogSubtitle.textContent = `Frozen at ${new Date().toLocaleTimeString()}`;
+        teamDialogBody.innerHTML = "<p>The selected team is not present in the latest FleetManager snapshot.</p>";
+        return;
+      }
+
+      const teamName = team.name || team.teamId || selectedTeamId;
+      const run = findTeamRun(latestSnapshot, team.currentRunId);
+      const members = Array.isArray(team.memberAgentIds) ? team.memberAgentIds : [];
+      teamDialogName.textContent = teamName;
+      teamDialogSubtitle.textContent = `Frozen at ${new Date().toLocaleTimeString()}`;
+      teamDialogBody.innerHTML = `
+        <div class="status-grid">
+          <div class="status-item"><span>Status</span><strong>${escapeHtml(team.status || "idle")}</strong></div>
+          <div class="status-item"><span>Current Run</span><strong>${escapeHtml(team.currentRunId || "(none)")}</strong></div>
+          <div class="status-item"><span>Leader</span><strong>${escapeHtml(team.leaderAgentId || "(none)")}</strong></div>
+          <div class="status-item"><span>Members</span><strong>${members.length}</strong></div>
+        </div>
+        <button id="team-details-toggle" class="details-toggle" type="button" aria-expanded="false">Show details</button>
+        <div id="team-details" class="team-details" hidden>
+          <h3>Description</h3>
+          <div>${escapeHtml(team.description || "No description.")}</div>
+          <h3>Run Summary</h3>
+          <div>
+            <div><strong>ID:</strong> ${escapeHtml(run?.id || team.currentRunId || "(none)")}</div>
+            <div><strong>Title:</strong> ${escapeHtml(run?.title || "(not available)")}</div>
+            <div><strong>Mode:</strong> ${escapeHtml(run?.mode || "(not available)")}</div>
+            <div><strong>Status:</strong> ${escapeHtml(run?.status || team.status || "(not available)")}</div>
+          </div>
+          <h3>Members</h3>
+          <ul>${members.map(member => `<li>${escapeHtml(member)}</li>`).join("") || "<li>No members.</li>"}</ul>
+        </div>`;
+
+      const toggle = document.getElementById("team-details-toggle");
+      const details = document.getElementById("team-details");
+      toggle.addEventListener("click", () => {
+        const nextExpanded = details.hidden;
+        details.hidden = !nextExpanded;
+        toggle.setAttribute("aria-expanded", String(nextExpanded));
+        toggle.textContent = nextExpanded ? "Hide details" : "Show details";
+      });
+    }
+
+    teamDialogRefresh.addEventListener("click", () => {
+      renderTeamStatusDialog();
+    });
+    teamDialogClose.addEventListener("click", closeTeamStatusDialog);
+    teamDialogBackdrop.addEventListener("click", event => {
+      if (event.target === teamDialogBackdrop) {
+        closeTeamStatusDialog();
+      }
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !teamDialogBackdrop.hidden) {
+        closeTeamStatusDialog();
+      }
+    });
+
+    if (window.chrome?.webview) {
+      window.chrome.webview.addEventListener("message", event => render(event.data));
+    } else {
+      render({
+        teams: [
+          {
+            teamId: "sample-team",
+            name: "Sample Team",
+            description: "Local fallback preview",
+            leaderAgentId: "LeaderAgent",
+            status: "running",
+            currentRunId: "sample-run",
+            memberAgentIds: ["LeaderAgent", "WorkerAgent", "SharedAgent"]
+          },
+          {
+            teamId: "review-team",
+            name: "Review Team",
+            description: "Shared member preview",
+            leaderAgentId: "SharedAgent",
+            status: "idle",
+            currentRunId: "(none)",
+            memberAgentIds: ["SharedAgent", "ReviewerAgent"]
+          }
+        ],
+        agents: [
+          { agentName: "LeaderAgent", status: "running", description: "Team leader", teamCount: 1 },
+          { agentName: "WorkerAgent", status: "idle", description: "Worker", teamCount: 1 },
+          { agentName: "SharedAgent", status: "busy", description: "Shared leader/member", teamCount: 2 },
+          { agentName: "ReviewerAgent", status: "Not configured", description: "Missing agent settings", teamCount: 1 }
+        ],
+        teamRuns: []
+      });
+    }
+  </script>
+</body>
+</html>
+
+
+

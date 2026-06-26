@@ -1,0 +1,8 @@
+{
+  "proxyUrl": "http://localhost:5058",
+  "controlUrl": "http://localhost:5068",
+  "fleet": {
+    "firstControlPort": 5068,
+    "instanceCount": 20
+  }
+}

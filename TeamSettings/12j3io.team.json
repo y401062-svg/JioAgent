@@ -1,0 +1,13 @@
+{
+  "teamId": "12j3io",
+  "name": "\uC0DD\uC0B0\uD300",
+  "description": "\uC0DD\uC0B0\uD300",
+  "leaderAgentId": "\uC0DD\uC0B0\uD300\uC7A5",
+  "maxTaskCount": 50,
+  "maxTrashTaskCount": 200,
+  "maxQuestionCount": 20,
+  "memberAgentIds": [
+    "\uC0DD\uC0B0\uAD00\uB9AC\uC790",
+    "\uC0DD\uC0B0\uD300\uC7A5"
+  ]
+}

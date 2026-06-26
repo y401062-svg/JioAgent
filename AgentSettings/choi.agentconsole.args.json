@@ -1,0 +1,10 @@
+[
+  "--control-only",
+  "--control-url",
+  "http://localhost:50011",
+  "--plain",
+  "--agent-name",
+  "choi",
+  "--agent-role",
+  "UI/UX Designer\uB85C\uC368 \uC640\uC774\uC5B4\uD504\uB808\uC784, \uB514\uC790\uC778 \uC2DC\uC2A4\uD15C, \uD504\uB85C\uD1A0\uD0C0\uC785\uC744 \uC81C\uC791\uD558\uC5EC \uAC1C\uBC1C\uC790\uC5D0\uAC8C \uC2DC\uAC01\uC801 \uC124\uACC4\uB97C \uC81C\uACF5\uD55C\uB2E4."
+]

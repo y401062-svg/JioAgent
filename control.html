@@ -1,0 +1,4024 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Control</title>
+  <link rel="stylesheet" href="vendor/highlight-theme.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --surface-2: #eef3f6;
+      --surface-3: #f9fbfc;
+      --text: #17202a;
+      --muted: #647386;
+      --line: #d7e0e8;
+      --line-strong: #acbccb;
+      --accent: #0b7189;
+      --accent-strong: #075a6d;
+      --green: #16734c;
+      --amber: #9a5b00;
+      --red: #b42318;
+      --code-bg: #101923;
+      --code-text: #e8eef5;
+      --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+      --shadow-strong: 0 20px 50px rgba(16, 24, 40, 0.16);
+      --chat-log-bottom: 170px;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    button, input, textarea, select { font: inherit; }
+
+    button {
+      min-height: 34px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 7px 11px;
+      color: var(--text);
+      background: var(--surface);
+      font-weight: 650;
+      cursor: pointer;
+      white-space: normal;
+      line-height: 1.2;
+    }
+
+    button:hover:not(:disabled) { border-color: var(--accent); }
+    button:disabled { cursor: wait; opacity: 0.58; }
+    button.primary { border-color: var(--accent); color: #fff; background: var(--accent); }
+    button.primary:hover:not(:disabled) { background: var(--accent-strong); }
+    button.danger { border-color: #e7aaa5; color: var(--red); background: #fff7f6; }
+    button.warning { border-color: #e4c78d; color: var(--amber); background: #fffaf0; }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text);
+      background: #fff;
+      min-width: 0;
+    }
+
+    textarea {
+      min-height: 124px;
+      resize: vertical;
+      line-height: 1.45;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 12.5px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    pre {
+      margin: 0;
+      min-height: 96px;
+      max-height: 520px;
+      overflow: auto;
+      border-radius: 6px;
+      padding: 12px;
+      color: var(--code-text);
+      background: var(--code-bg);
+      font: 12.5px/1.48 Consolas, "Cascadia Mono", monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: block;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 8px;
+      left: 10px;
+      z-index: 8;
+      display: flex;
+      justify-content: flex-start;
+      pointer-events: none;
+    }
+
+    .brand,
+    .top-status {
+      display: none;
+    }
+
+    .topbar-actions {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      pointer-events: auto;
+    }
+
+    .icon-button {
+      display: inline-grid;
+      place-items: center;
+      width: 36px;
+      min-width: 36px;
+      height: 34px;
+      padding: 0;
+    }
+
+    .icon-button svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .token-usage-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 34px;
+      max-width: min(520px, calc(100vw - 62px));
+      padding: 0;
+      color: var(--text);
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      pointer-events: none;
+    }
+
+    .token-usage-long,
+    .token-usage-short {
+      overflow: hidden;
+      font-size: 11.5px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .token-usage-short { display: none; }
+
+    body.ops-open .token-usage-badge { display: none; }
+
+    .settings-wrap { position: relative; }
+
+    .settings-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 14;
+      display: none;
+      width: min(420px, calc(100vw - 24px));
+      max-height: calc(100vh - 70px);
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow-strong);
+    }
+
+    body.settings-open .settings-panel { display: grid; gap: 12px; }
+
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .settings-header h2 { margin: 0; font-size: 14px; }
+
+    .base-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .runtime-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(86px, auto));
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .strip-item {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: var(--surface-3);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 204px minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .nav {
+      border-right: 1px solid var(--line);
+      padding: 12px;
+      background: #fbfcfd;
+    }
+
+    .nav button {
+      width: 100%;
+      min-height: 36px;
+      margin-bottom: 6px;
+      text-align: left;
+      border-color: transparent;
+      background: transparent;
+    }
+
+    .nav button.active {
+      border-color: var(--line);
+      background: var(--surface-2);
+      color: var(--accent-strong);
+    }
+
+    .content {
+      min-width: 0;
+      padding: 16px;
+      overflow: auto;
+    }
+
+    .view { display: none; gap: 14px; }
+    .view.active { display: grid; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: minmax(300px, 430px) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.10);
+      min-width: 0;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-header h2 { margin: 0; font-size: 15px; }
+    .panel-body { display: grid; gap: 12px; padding: 14px; min-width: 0; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .toolbar > button { min-width: 76px; }
+
+    .metric {
+      min-height: 76px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--surface);
+      min-width: 0;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .metric-value {
+      margin-top: 8px;
+      font-size: 15px;
+      font-weight: 750;
+      word-break: break-word;
+    }
+
+    .metric-note {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .table th, .table td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    .table th { color: var(--muted); font-size: 12px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--muted);
+      background: var(--surface-2);
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.2;
+    }
+
+    .badge.ok { border-color: #b8dac9; color: var(--green); background: #f1fbf5; }
+    .badge.warn { border-color: #e4c78d; color: var(--amber); background: #fffaf0; }
+    .badge.fail { border-color: #efc4c0; color: var(--red); background: #fff7f6; }
+
+    .error-box {
+      display: none;
+      border: 1px solid #efc4c0;
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--red);
+      background: #fff7f6;
+      font-size: 13px;
+      font-weight: 650;
+      white-space: pre-wrap;
+    }
+
+    .error-box.visible { display: block; }
+
+    .muted { color: var(--muted); }
+    .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; }
+
+    .assistant-text, .prompt-preview {
+      min-height: 130px;
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      background: #fbfcfd;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+      max-height: 520px;
+      overflow: auto;
+    }
+
+    .list-item {
+      display: grid;
+      gap: 7px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--surface-3);
+    }
+
+    .item-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .item-title { font-weight: 760; word-break: break-word; }
+    .item-sub { color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .inline-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .inline-check input {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 10px 12px;
+      font-weight: 750;
+    }
+
+    details pre {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+
+    .warning-note {
+      border: 1px solid #e4c78d;
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--amber);
+      background: #fffaf0;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    @media (max-width: 1040px) {
+      .layout, .grid-2, .grid-3, .split { grid-template-columns: 1fr; }
+      .runtime-strip { grid-template-columns: 1fr; }
+      .nav {
+        display: flex;
+        gap: 6px;
+        overflow: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .nav button {
+        width: auto;
+        min-width: 86px;
+        margin-bottom: 0;
+        text-align: center;
+      }
+      .base-row { grid-template-columns: 1fr; }
+      .content { padding: 12px; }
+    }
+
+    .base-row label { font-size: 11px; }
+    .base-row input { min-height: 30px; padding: 5px 8px; font-size: 12px; }
+    .runtime-strip { grid-template-columns: repeat(3, minmax(78px, auto)); }
+    .strip-item { min-height: 30px; padding: 4px 7px; font-size: 11px; }
+
+    .layout {
+      display: block;
+      min-height: 100vh;
+      background: #f7f8fa;
+    }
+
+    .content {
+      height: 100vh;
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .view { display: none; }
+    #view-chat.view.active {
+      display: grid;
+      height: 100%;
+    }
+
+    .chat-first {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .chat-log {
+      min-height: 0;
+      overflow: auto;
+      padding: 28px max(18px, calc((100vw - 1290px) / 2)) var(--chat-log-bottom);
+    }
+
+    .external-turn-overlay {
+      position: fixed;
+      left: 50%;
+      bottom: 34px;
+      z-index: 5;
+      display: none;
+      transform: translateX(-50%);
+      align-items: center;
+      gap: 10px;
+      max-width: min(460px, calc(100vw - 32px));
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.74);
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.10);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .external-turn-spinner {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      border: 2px solid #d8e0e7;
+      border-top-color: var(--accent);
+      border-radius: 999px;
+      animation: external-turn-spin 0.85s linear infinite;
+    }
+
+    .chat-first.external-turn-running .external-turn-overlay {
+      display: flex;
+    }
+
+    .chat-first.external-turn-running .composer-wrap {
+      display: none;
+    }
+
+    @keyframes external-turn-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty-chat {
+      max-width: 1080px;
+      margin: 22vh auto 0;
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .chat-message {
+      display: flex;
+      max-width: 1290px;
+      margin: 0 auto 18px;
+    }
+
+    .chat-message.user { justify-content: flex-end; }
+    .chat-message.assistant { justify-content: flex-start; }
+
+    .message-body {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+      max-width: min(1140px, 100%);
+    }
+
+    .bubble {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: var(--surface);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .chat-message.assistant .bubble.markdown {
+      white-space: normal;
+      overflow-wrap: break-word;
+    }
+
+    .markdown > :first-child { margin-top: 0; }
+    .markdown > :last-child { margin-bottom: 0; }
+
+    .markdown h1,
+    .markdown h2,
+    .markdown h3 {
+      margin: 14px 0 8px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .markdown h1 { font-size: 21px; }
+    .markdown h2 { font-size: 18px; }
+    .markdown h3 { font-size: 15px; }
+    .markdown p { margin: 0 0 10px; }
+
+    .markdown ul,
+    .markdown ol {
+      margin: 0 0 10px 22px;
+      padding: 0;
+    }
+
+    .markdown li { margin: 3px 0; }
+
+    .markdown blockquote {
+      margin: 0 0 10px;
+      border-left: 3px solid var(--line-strong);
+      padding: 2px 0 2px 12px;
+      color: var(--muted);
+    }
+
+    .markdown code {
+      border-radius: 4px;
+      padding: 1px 4px;
+      background: #eef3f6;
+      font: 12.5px/1.45 Consolas, "Cascadia Mono", monospace;
+    }
+
+    .markdown pre {
+      max-width: 100%;
+      min-height: 0;
+      max-height: 440px;
+      margin: 0;
+      color: #24292f;
+      background: #f6f8fa;
+      white-space: pre;
+      word-break: normal;
+      overflow: auto;
+    }
+
+    .markdown pre code {
+      display: block;
+      min-width: max-content;
+      padding: 0;
+      color: inherit;
+      background: transparent;
+      font: inherit;
+    }
+
+    .markdown pre code.hljs {
+      color: #24292f;
+      background: transparent;
+    }
+
+    .code-block {
+      display: grid;
+      gap: 0;
+      max-width: 100%;
+      margin: 0 0 10px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f6f8fa;
+    }
+
+    .code-block-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      min-height: 32px;
+      padding: 4px 6px 4px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #eef3f6;
+    }
+
+    .code-language {
+      min-width: 0;
+      margin-right: auto;
+      color: var(--accent-strong);
+      font-size: 11px;
+      font-weight: 750;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .code-copy {
+      min-width: 52px;
+      min-height: 26px;
+      padding: 4px 8px;
+      border-color: var(--line-strong);
+      color: var(--text);
+      background: var(--surface);
+      font-size: 11px;
+    }
+
+    @media (max-width: 520px) {
+      .code-block-head {
+        align-items: start;
+        flex-wrap: wrap;
+      }
+
+      .code-language {
+        flex: 1 1 150px;
+        white-space: normal;
+      }
+    }
+
+    .markdown-table-wrap {
+      max-width: 100%;
+      margin: 0 0 10px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+    }
+
+    .markdown table {
+      width: 100%;
+      min-width: 420px;
+      border-collapse: collapse;
+      font-size: 13px;
+      white-space: normal;
+    }
+
+    .markdown th,
+    .markdown td {
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      padding: 7px 9px;
+      text-align: left;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .markdown th:last-child,
+    .markdown td:last-child { border-right: 0; }
+
+    .markdown tr:last-child td { border-bottom: 0; }
+
+    .markdown th {
+      color: var(--muted);
+      background: #f4f7f9;
+      font-weight: 760;
+    }
+
+    .markdown a {
+      color: var(--accent-strong);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+
+    .chat-message.user .bubble {
+      background: #edf6f8;
+      border-color: #c9e5ea;
+    }
+
+    .typing-bubble {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      width: fit-content;
+      min-width: 58px;
+      min-height: 42px;
+      padding: 12px 15px;
+    }
+
+    .typing-bubble span {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--muted);
+      opacity: 0.42;
+      animation: typing-dot 1.05s ease-in-out infinite;
+    }
+
+    .typing-bubble span:nth-child(2) { animation-delay: 0.15s; }
+    .typing-bubble span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes typing-dot {
+      0%, 70%, 100% { transform: translateY(0); opacity: 0.42; }
+      35% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    .activity-stack {
+      display: grid;
+      gap: 4px;
+      margin: 0 0 8px;
+    }
+
+    .activity-row {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 5px 8px;
+      background: #fbfcfd;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.28;
+    }
+
+    .activity-row.success { color: var(--green); background: #f4fbf7; border-color: #cbe8d7; }
+    .activity-row.failed { color: var(--red); background: #fff7f6; border-color: #efc4c0; }
+    .activity-row.running { color: var(--amber); background: #fffaf0; border-color: #e4c78d; }
+    .activity-row.canceled { color: var(--muted); background: #f3f5f7; }
+    .activity-row[data-tool-call-id] { cursor: pointer; }
+    .activity-row[data-tool-call-id]:hover { filter: brightness(0.985); }
+    .activity-summary { min-width: 0; overflow-wrap: anywhere; }
+    .activity-status { font-size: 11px; font-weight: 800; text-transform: uppercase; }
+    .activity-tool { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(15, 23, 42, 0.38);
+    }
+
+    .modal-backdrop[hidden] { display: none; }
+
+    .tool-result-dialog {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 12px;
+      width: min(860px, 100%);
+      max-height: min(780px, calc(100vh - 36px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--surface);
+      box-shadow: var(--shadow-strong);
+    }
+
+    .tool-result-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .tool-result-head h2 { margin: 0; font-size: 15px; }
+    .tool-result-actions { display: flex; gap: 8px; }
+
+    .tool-result-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .tool-result-meta .strip-item { color: var(--text); overflow-wrap: anywhere; }
+
+    .tool-result-body {
+      min-height: 180px;
+      max-height: 520px;
+      overflow: auto;
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      background: #fbfcfd;
+      color: var(--text);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .composer-wrap {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 4;
+      padding: 12px 18px 18px;
+      background: linear-gradient(to top, #f7f8fa 82%, rgba(247, 248, 250, 0));
+    }
+
+    .composer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 6px;
+      max-width: 1290px;
+      margin: 0 auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow-strong);
+    }
+
+    .composer textarea {
+      min-height: 54px;
+      max-height: min(40vh, 320px);
+      overflow-y: hidden;
+      border: 0;
+      padding: 8px;
+      resize: none;
+      font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+      outline: none;
+    }
+
+    .composer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 24px;
+    }
+
+    .composer-actions button { min-width: 42px; min-height: 28px; padding: 4px 8px; }
+    .prompt-mode {
+      position: relative;
+      align-self: center;
+      margin-left: 8px;
+    }
+
+    #promptModeButton {
+      min-width: 0;
+      min-height: 24px;
+      justify-content: flex-start;
+      gap: 4px;
+      border: 0;
+      padding: 2px 0;
+      color: var(--muted);
+      background: transparent;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    #promptModeButton:hover:not(:disabled) {
+      border-color: transparent;
+      background: transparent;
+      color: var(--accent);
+    }
+
+    #promptModeButton[aria-expanded="true"],
+    #promptModeButton[data-mode="advanced"] {
+      color: var(--accent-strong);
+      border-color: transparent;
+      background: transparent;
+    }
+
+    #promptModeButton[data-mode="default"] {
+      color: var(--muted);
+    }
+
+    #promptModeLabel {
+      display: inline-block;
+    }
+
+    #promptModeButton[data-mode="advanced"] #promptModeLabel {
+      color: var(--accent-strong);
+    }
+
+    .prompt-mode-caret {
+      color: currentColor;
+      font-size: 10px;
+      line-height: 1;
+    }
+
+    .prompt-mode-menu {
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 6px);
+      z-index: 7;
+      width: 176px;
+      display: grid;
+      gap: 4px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.10);
+    }
+
+    .prompt-mode-menu[hidden] { display: none; }
+
+    .prompt-mode-option {
+      width: 100%;
+      min-height: 34px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      border: 0;
+      padding: 7px 8px;
+      color: var(--text);
+      background: transparent;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .prompt-mode-option:hover:not(:disabled),
+    .prompt-mode-option[aria-checked="true"] {
+      color: var(--accent-strong);
+      background: #f4f8ff;
+    }
+
+    .prompt-mode-option[aria-checked="true"]::after {
+      content: "✓";
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .composer-meta {
+      max-width: 1290px;
+      margin: 7px auto 0;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .reset-link {
+      min-height: auto;
+      border: 0;
+      padding: 0;
+      color: var(--muted);
+      background: transparent;
+      font-size: 12px;
+      font-weight: 650;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .reset-link:hover:not(:disabled) {
+      color: var(--red);
+      border-color: transparent;
+    }
+
+    .brief-question-bubble {
+      display: grid;
+      gap: 12px;
+    }
+
+    .brief-question-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .brief-question-list label {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .brief-question-list textarea {
+      min-height: 84px;
+      width: 100%;
+      resize: vertical;
+      font-weight: 500;
+    }
+
+    .brief-question-actions {
+      display: flex;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+
+    .brief-question-actions button {
+      min-width: 92px;
+    }
+
+    .ops-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 8;
+      display: none;
+      background: rgba(15, 23, 42, 0.18);
+    }
+
+    body.ops-open .ops-backdrop { display: block; }
+
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 10;
+      width: min(1060px, 92vw);
+      display: grid;
+      grid-template-columns: 172px minmax(0, 1fr);
+      gap: 0;
+      padding: 0;
+      border-left: 0;
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--shadow-strong);
+      transform: translateX(-105%);
+      transition: transform 160ms ease;
+    }
+
+    body.ops-open .nav { transform: translateX(0); }
+
+    .nav::before {
+      content: "Operations";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 172px;
+      height: 42px;
+      padding: 13px 12px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      background: #fbfcfd;
+    }
+
+    .nav button {
+      grid-column: 1;
+      margin: 0;
+      border-radius: 0;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      padding: 9px 12px;
+      text-align: left;
+      background: #fbfcfd;
+      min-height: 38px;
+    }
+
+    .nav button:first-child { margin-top: 42px; }
+    .nav button[data-view-button="chat"] { display: none; }
+
+    .content > .view:not(#view-chat) {
+      position: fixed;
+      top: 0;
+      left: 172px;
+      bottom: 0;
+      z-index: 11;
+      width: min(888px, calc(92vw - 172px));
+      overflow: auto;
+      padding: 14px;
+      background: var(--surface-3);
+      transform: translateX(-105%);
+      transition: transform 160ms ease;
+    }
+
+    body:not(.ops-open) .content > .view.active:not(#view-chat) {
+      display: none;
+    }
+
+    body.ops-open .content > .view.active:not(#view-chat) {
+      display: grid;
+      transform: translateX(0);
+    }
+
+    body.ops-open .content > .view.ops-single-column.active:not(#view-chat) > .grid-2 {
+      grid-template-columns: 1fr;
+    }
+
+    body.ops-open .content > .view.ops-single-column.active:not(#view-chat) textarea,
+    body.ops-open .content > .view.ops-single-column.active:not(#view-chat) pre {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    body.ops-open #view-chat.view.active { display: grid; }
+
+    .drawer-close {
+      position: fixed;
+      top: 6px;
+      left: calc(min(1060px, 92vw) - 44px);
+      z-index: 12;
+      display: none;
+      min-width: 36px;
+    }
+
+    body.ops-open .drawer-close { display: inline-grid; }
+
+    @media (max-width: 760px) {
+      .topbar { top: 8px; left: 8px; }
+      .token-usage-badge {
+        max-width: calc(100vw - 54px);
+      }
+      .token-usage-long { display: none; }
+      .token-usage-short { display: block; }
+      .runtime-strip { grid-template-columns: repeat(3, 1fr); }
+      .settings-panel {
+        position: fixed;
+        top: 48px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-height: calc(100vh - 64px);
+      }
+      .content { height: 100vh; }
+      .chat-log { padding: 16px 12px var(--chat-log-bottom); }
+      .message-body { max-width: 100%; }
+      .chat-message.user .message-body { max-width: min(620px, 92%); }
+      .composer-wrap { padding: 10px; }
+      .composer { grid-template-columns: 1fr; }
+      .composer-actions { justify-content: space-between; }
+      .activity-row { grid-template-columns: 22px minmax(0, 1fr); }
+      .activity-status { grid-column: 2; }
+      .typing-bubble { min-width: 54px; }
+      .nav { width: 100vw; grid-template-columns: 126px minmax(0, 1fr); }
+      .nav::before { width: 126px; }
+      .drawer-close { left: calc(100vw - 44px); }
+      .content > .view:not(#view-chat) { left: 126px; width: calc(100vw - 126px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <h1>Agent Control</h1>
+        <span>Chat-first control</span>
+      </div>
+      <div id="topStatus" class="top-status">ready</div>
+      <div class="topbar-actions">
+        <div class="settings-wrap">
+          <button id="openOps" class="icon-button" type="button" aria-label="Options" title="Options">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.36.49.7.88.88.34.16.72.24 1.1.24H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51.9Z"></path>
+            </svg>
+          </button>
+          <div id="settingsPanel" class="settings-panel" role="dialog" aria-label="Control settings">
+            <div class="settings-header">
+              <h2>Settings</h2>
+              <button id="settingsClose" class="icon-button" type="button" aria-label="Close settings">X</button>
+            </div>
+            <div class="base-row">
+              <label>Control URL
+                <input id="baseUrl" autocomplete="off" spellcheck="false">
+              </label>
+              <button id="loadSpec" class="primary" data-endpoint="/openapi.json">Spec</button>
+              <button id="refreshActive">Refresh</button>
+            </div>
+            <div class="muted">When opened as a local file, this page starts from the default control URL. If `config/agent.endpoints.json` uses a different controlUrl, enter it here.</div>
+            <div class="runtime-strip">
+              <div class="strip-item"><div class="metric-label">Spec</div><div id="specStatus">not loaded</div></div>
+              <div class="strip-item"><div class="metric-label">Last request</div><div id="lastRequest">none</div></div>
+              <div class="strip-item"><div class="metric-label">Last refresh</div><div id="lastRefresh">never</div></div>
+            </div>
+          </div>
+        </div>
+        <div id="tokenUsageBadge" class="token-usage-badge" aria-live="polite" hidden>
+          <div id="tokenUsageLong" class="token-usage-long"></div>
+          <div id="tokenUsageShort" class="token-usage-short"></div>
+        </div>
+      </div>
+    </header>
+    <div id="opsBackdrop" class="ops-backdrop"></div>
+    <button id="closeOps" class="drawer-close" aria-label="Close operations panel">×</button>
+
+    <div class="layout">
+      <nav class="nav" aria-label="Views">
+        <button data-view-button="status">Status</button>
+        <button class="active" data-view-button="chat">Chat</button>
+        <button data-view-button="payload">Payload</button>
+        <button data-view-button="memory">Memory</button>
+        <button data-view-button="skills">Skills</button>
+        <button data-view-button="mcp">MCP</button>
+        <button data-view-button="proxy">Proxy</button>
+        <button data-view-button="commands">Commands</button>
+        <button data-view-button="explorer">API Explorer</button>
+      </nav>
+
+      <main class="content">
+        <div id="globalError" class="error-box"></div>
+        <div id="devWarning" class="warning-note" hidden></div>
+
+        <section id="view-status" class="view">
+          <div class="grid-3">
+            <div class="metric"><div class="metric-label">Health</div><div id="metricHealth" class="metric-value">Unknown</div></div>
+            <div class="metric"><div class="metric-label">Control URL</div><div id="metricControlUrl" class="metric-value">Unknown</div></div>
+            <div class="metric"><div class="metric-label">Proxy</div><div id="metricProxy" class="metric-value">Unknown</div></div>
+            <div class="metric"><div class="metric-label">Model</div><div id="metricModel" class="metric-value">Unknown</div></div>
+            <div class="metric"><div class="metric-label">Memory</div><div id="metricMemory" class="metric-value">Unknown</div></div>
+            <div class="metric"><div class="metric-label">OpenAPI</div><div id="metricOpenApi" class="metric-value">Unknown</div></div>
+            <div class="metric"><div class="metric-label">Latest actual usage</div><div id="metricUsage" class="metric-value"></div><div id="metricUsageNote" class="metric-note"></div></div>
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Status</h2>
+                <button id="refreshStatus" data-endpoint="/health">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <div class="toolbar">
+                  <button data-load-json="/health" data-target="statusJson">Health</button>
+                  <button data-load-json="/config" data-target="statusJson">Config</button>
+                  <button data-load-json="/context" data-target="statusJson">Context</button>
+                  <button data-load-json="/proxy" data-target="statusJson">Proxy</button>
+                  <button data-load-json="/memory" data-target="statusJson">Memory</button>
+                </div>
+                <table class="table"><tbody id="statusTable"></tbody></table>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Status JSON</h2>
+                <button data-copy="statusJson">Copy</button>
+              </div>
+              <pre id="statusJson">{}</pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-chat" class="view active">
+          <div class="chat-first">
+            <div id="chatLog" class="chat-log" aria-live="polite">
+            </div>
+            <div id="externalTurnOverlay" class="external-turn-overlay" aria-live="polite" aria-hidden="true"><span class="external-turn-spinner" aria-hidden="true"></span><span>Running...</span></div>
+            <div class="composer-wrap">
+              <div class="composer">
+                <textarea id="message" spellcheck="true" placeholder="Message"></textarea>
+                <div class="composer-actions">
+                  <div class="prompt-mode">
+                    <button id="promptModeButton" type="button" data-endpoint="/brief/plan" aria-haspopup="menu" aria-expanded="false" data-mode="default" title="Default Prompt">
+                      <span id="promptModeLabel">Default Prompt</span>
+                      <span class="prompt-mode-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div id="promptModeMenu" class="prompt-mode-menu" role="menu" hidden>
+                      <button class="prompt-mode-option" type="button" role="menuitemradio" aria-checked="true" data-prompt-mode="default">Default Prompt</button>
+                      <button class="prompt-mode-option" type="button" role="menuitemradio" aria-checked="false" data-prompt-mode="advanced">Advanced Prompt</button>
+                    </div>
+                  </div>
+                  <button id="messageAction" class="primary" data-endpoint="/turns">Send</button>
+                </div>
+              </div>
+              <div class="composer-meta">
+                <button id="resetConversation" class="reset-link" data-endpoint="/reset">Reset Conversation</button>
+              </div>
+            </div>
+            <div hidden>
+              <div id="assistantText" class="assistant-text muted">No response yet.</div>
+              <pre id="chatJson">{}</pre>
+              <pre id="briefJson">{}</pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-payload" class="view ops-single-column">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Payload</h2>
+                <button id="refreshPayload" data-endpoint="/payload">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <div class="grid-3">
+                  <div class="metric"><div class="metric-label">Rough Tokens</div><div id="payloadTokens" class="metric-value">Unknown</div></div>
+                  <div class="metric"><div class="metric-label">Tools</div><div id="payloadTools" class="metric-value">Unknown</div></div>
+                  <div class="metric"><div class="metric-label">Skills</div><div id="payloadSkills" class="metric-value">Unknown</div></div>
+                </div>
+                <pre id="payloadPreview">{}</pre>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Payload JSON</h2>
+                <button data-copy="payloadJson">Copy JSON</button>
+              </div>
+              <div class="panel-body">
+                <textarea id="payloadJson" readonly>{}</textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-memory" class="view ops-single-column">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Memory</h2>
+                <button id="refreshMemory" data-endpoint="/memory">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <div class="grid-3">
+                  <div class="metric"><div class="metric-label">Required</div><div id="memoryRequired" class="metric-value">Unknown</div></div>
+                  <div class="metric"><div class="metric-label">Messages</div><div id="memoryMessages" class="metric-value">Unknown</div></div>
+                  <div class="metric"><div class="metric-label">Rough Estimated Tokens</div><div id="memoryTokens" class="metric-value">Unknown</div></div>
+                  <div class="metric" id="memoryLastInputTokensMetric" hidden><div class="metric-label">Last Input Tokens</div><div id="memoryLastInputTokens" class="metric-value">Unknown</div></div>
+                  <div class="metric" id="memoryLastOutputTokensMetric" hidden><div class="metric-label">Last Output Tokens</div><div id="memoryLastOutputTokens" class="metric-value">Unknown</div></div>
+                  <div class="metric" id="memoryLastActualTokensMetric" hidden><div class="metric-label">Last Actual Sum</div><div id="memoryLastActualTokens" class="metric-value">Unknown</div></div>
+                  <div class="metric" id="memoryRoughDeltaMetric" hidden><div class="metric-label">Rough Delta</div><div id="memoryRoughDelta" class="metric-value">Unknown</div></div>
+                  <div class="metric" id="memoryTriggerTokensMetric" hidden><div class="metric-label">Trigger Tokens</div><div id="memoryTriggerTokens" class="metric-value">Unknown</div></div>
+                  <div class="metric" id="memoryTriggerSourceMetric" hidden><div class="metric-label">Trigger Source</div><div id="memoryTriggerSource" class="metric-value">Unknown</div></div>
+                  <div class="metric" id="memoryTriggerThresholdMetric" hidden><div class="metric-label">Trigger Threshold</div><div id="memoryTriggerThreshold" class="metric-value">Unknown</div></div>
+                </div>
+                <button id="compactMemory" class="warning" data-endpoint="/memory/compact">Compact Memory</button>
+                <table class="table"><tbody id="memoryTable"></tbody></table>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Memory JSON</h2>
+                <button data-copy="memoryJson">Copy JSON</button>
+              </div>
+              <pre id="memoryJson">{}</pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-skills" class="view">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Skills</h2>
+                <button id="refreshSkills" data-endpoint="/skills">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <label>Filter
+                  <input id="skillFilter" autocomplete="off" placeholder="name, category, tag">
+                </label>
+                <label>Skill Name
+                  <input id="skillName" autocomplete="off">
+                </label>
+                <div class="toolbar">
+                  <button id="loadSkillDetail" data-endpoint="/skills/{name}">Details</button>
+                  <button id="activateSkill" data-endpoint="/skill/activate">Activate</button>
+                  <button id="deactivateSkill" data-endpoint="/skill/deactivate">Deactivate</button>
+                </div>
+                <div id="skillsList" class="list"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Skill Detail</h2>
+                <button data-copy="skillsJson">Copy JSON</button>
+              </div>
+              <div class="panel-body">
+                <table class="table"><tbody id="skillDetailTable"></tbody></table>
+                <pre id="skillInstructions">Select a skill to view details.</pre>
+                <pre id="skillsJson">{}</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-mcp" class="view">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>MCP</h2>
+                <button id="refreshMcp" data-endpoint="/mcp">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <label>Server Id
+                  <input id="mcpId" autocomplete="off">
+                </label>
+                <div class="toolbar">
+                  <button id="loadMcpServer" data-endpoint="/mcp/{id}">Server</button>
+                  <button id="loadMcpTools" data-endpoint="/mcp/{id}/tools">Tools</button>
+                  <button id="loadAllTools" data-endpoint="/tools">All Tools</button>
+                  <button id="applyMcpActive" class="primary" data-endpoint="/mcp/active">Replace Active Set</button>
+                </div>
+                <div class="warning-note">PUT /mcp/active replaces the active server set. Current active ids are reloaded after every save.</div>
+                <div id="mcpList" class="list"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>MCP JSON</h2>
+                <button data-copy="mcpJson">Copy JSON</button>
+              </div>
+              <div class="panel-body">
+                <div id="toolsList" class="list"></div>
+                <pre id="mcpJson">{}</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-proxy" class="view">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Proxy</h2>
+                <button id="refreshProxy" data-endpoint="/proxy">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <table class="table"><tbody id="proxyTable"></tbody></table>
+                <div class="split">
+                  <label>Base URL<input id="proxyBaseUrl" autocomplete="off"></label>
+                  <label>Default Model<input id="proxyDefaultModel" autocomplete="off"></label>
+                  <label>Chat Endpoint<input id="proxyEndpoint" autocomplete="off"></label>
+                  <label>Timeout Seconds<input id="proxyTimeout" type="number" min="0"></label>
+                </div>
+                <label class="inline-check"><input id="proxyApplyOnly" type="checkbox" checked>applyOnly</label>
+                <label class="inline-check"><input id="proxyPersist" type="checkbox">persist</label>
+                <label class="inline-check"><input id="proxyForceShared" type="checkbox">forceSharedProxy</label>
+                <div class="toolbar">
+                  <button id="loadProxyConfig" data-endpoint="/proxy/config">Config</button>
+                  <button id="saveProxyConfig" class="primary" data-endpoint="/proxy/config">Apply Config</button>
+                  <button id="checkProxyLlm" class="warning" data-endpoint="/proxy/check-llm">Check LLM</button>
+                  <button id="restartProxy" class="danger" data-endpoint="/proxy/restart">Restart</button>
+                  <button id="stopProxy" class="danger" data-endpoint="/proxy/stop">Stop</button>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Proxy JSON</h2>
+                <button data-copy="proxyJson">Copy JSON</button>
+              </div>
+              <pre id="proxyJson">{}</pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-commands" class="view">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Commands</h2>
+                <button id="refreshCommands" data-endpoint="/commands">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <label>Command
+                  <input id="commandText" autocomplete="off" value="/payload json">
+                </label>
+                <div class="toolbar">
+                  <button id="sendCommand" class="primary" data-endpoint="/command">Run</button>
+                </div>
+                <div id="commandList" class="list"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Command JSON</h2>
+                <button data-copy="commandsJson">Copy JSON</button>
+              </div>
+              <pre id="commandsJson">{}</pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-explorer" class="view">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>API Explorer</h2>
+                <button id="refreshExplorerSpec" data-endpoint="/openapi.json">Refresh Spec</button>
+              </div>
+              <div class="panel-body">
+                <label>Filter
+                  <input id="operationFilter" autocomplete="off" placeholder="tag, method, path, summary">
+                </label>
+                <div id="operationList" class="list"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Explorer Request</h2>
+                <button data-copy="explorerJson">Copy Response</button>
+              </div>
+              <div class="panel-body">
+                <table class="table"><tbody id="operationDetail"></tbody></table>
+                <div id="pathParams" class="split"></div>
+                <label>JSON Body
+                  <textarea id="explorerBody" spellcheck="false">{}</textarea>
+                </label>
+                <div class="toolbar">
+                  <button id="sendExplorer" class="primary">Send</button>
+                </div>
+                <pre id="explorerJson">{}</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div id="toolResultModal" class="modal-backdrop" hidden>
+    <div class="tool-result-dialog" role="dialog" aria-modal="true" aria-labelledby="toolResultTitle">
+      <div class="tool-result-head">
+        <h2 id="toolResultTitle">Tool result</h2>
+        <div class="tool-result-actions">
+          <button id="copyToolResult" type="button">Copy</button>
+          <button id="closeToolResult" type="button">Close</button>
+        </div>
+      </div>
+      <div id="toolResultMeta" class="tool-result-meta"></div>
+      <pre id="toolResultContent" class="tool-result-body mono"></pre>
+    </div>
+  </div>
+  <script src="vendor/marked.umd.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="vendor/highlight.min.js"></script>
+  <script src="vendor/highlight-powershell.min.js"></script>
+  <script>
+    "use strict";
+
+    const DEFAULT_BASE_URL = location.protocol === "http:" ? location.origin : "http://localhost:5068";
+    const NON_ENVELOPE_PATHS = new Set(["/control.html", "/openapi.json", "/turns/{turnId}/events"]);
+    const DANGER_ENDPOINTS = new Set([
+      "/message",
+      "/turns",
+      "/turns/{turnId}/cancel",
+      "/brief/plan",
+      "/memory/compact",
+      "/mcp/active",
+      "/proxy/check-llm",
+      "/proxy/stop",
+      "/proxy/restart",
+      "/reset"
+    ]);
+    const DEDICATED_ENDPOINTS = new Set([
+      "/health", "/status", "/config", "/context", "/usage", "/message", "/turns", "/turns/{turnId}", "/turns/{turnId}/events", "/turns/{turnId}/cancel", "/brief/plan", "/cancel", "/reset",
+      "/proxy", "/proxy/config", "/proxy/check-llm", "/proxy/stop", "/proxy/restart",
+      "/memory", "/memory/compact", "/skills", "/skills/{name}", "/skill/activate",
+      "/skill/deactivate", "/mcp", "/mcp/active", "/mcp/{id}", "/mcp/{id}/tools",
+      "/tools", "/payload", "/payload/json", "/commands", "/command"
+    ]);
+    const MARKDOWN_CODE_LANGUAGE_ALIASES = new Map([
+      ["bash", "bash"],
+      ["c++", "cpp"],
+      ["cpp", "cpp"],
+      ["cs", "csharp"],
+      ["csharp", "csharp"],
+      ["css", "css"],
+      ["html", "xml"],
+      ["javascript", "javascript"],
+      ["js", "javascript"],
+      ["json", "json"],
+      ["powershell", "powershell"],
+      ["ps1", "powershell"],
+      ["python", "python"],
+      ["py", "python"],
+      ["shell", "bash"],
+      ["sh", "bash"]
+    ]);
+    let markdownCodeBlockId = 0;
+
+    const state = {
+      activeView: "chat",
+      spec: null,
+      operations: [],
+      selectedOperationKey: "",
+      pending: new Map(),
+      lastByPath: new Map(),
+      skills: [],
+      mcpActiveIds: [],
+      mcpServers: [],
+      chatMessages: [],
+      activeTurnId: "",
+      activeTurnMessage: null,
+      externalTurnRunning: false,
+      chatSyncInFlight: false,
+      chatSyncTimerId: 0,
+      chatPayloadSignature: "",
+      latestActualUsage: null,
+      usageRefreshInFlight: false,
+      promptAssistantRunId: 0,
+      promptAssistant: {
+        enabled: false,
+        originalMessage: "",
+        answers: [],
+        pending: false,
+        userMessage: null,
+        assistantMessage: null
+      }
+    };
+
+    const el = {};
+    for (const node of document.querySelectorAll("[id]")) {
+      el[node.id] = node;
+    }
+
+    el.baseUrl.value = DEFAULT_BASE_URL;
+    function updateComposerBottomSpace() {
+      const wrap = document.querySelector(".composer-wrap");
+      if (!wrap) return;
+      const bottom = Math.ceil(wrap.getBoundingClientRect().height + 18);
+      document.documentElement.style.setProperty("--chat-log-bottom", bottom + "px");
+    }
+
+    function resizeMessageComposer() {
+      if (!el.message) return;
+      el.message.style.height = "auto";
+      const maxHeight = Number.parseFloat(getComputedStyle(el.message).maxHeight) || 320;
+      const nextHeight = Math.min(el.message.scrollHeight, maxHeight);
+      el.message.style.height = nextHeight + "px";
+      el.message.style.overflowY = el.message.scrollHeight > maxHeight + 1 ? "auto" : "hidden";
+      updateComposerBottomSpace();
+    }
+
+    function baseUrl() {
+      return el.baseUrl.value.trim().replace(/\/+$/, "") || DEFAULT_BASE_URL;
+    }
+
+    function endpointUrl(path) {
+      return baseUrl() + path;
+    }
+
+    function operationPathFor(path) {
+      if (/^\/turns\/[^/]+\/events$/.test(path)) return "/turns/{turnId}/events";
+      if (/^\/turns\/[^/]+\/cancel$/.test(path)) return "/turns/{turnId}/cancel";
+      if (/^\/turns\/[^/]+$/.test(path)) return "/turns/{turnId}";
+      return path;
+    }
+
+    function expectsEnvelopeFor(path) {
+      return !NON_ENVELOPE_PATHS.has(operationPathFor(path));
+    }
+
+    function nowLabel() {
+      return new Date().toLocaleTimeString();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replaceAll("'", "&#39;");
+    }
+
+    function normalizeMarkdownUrl(url) {
+      const value = String(url ?? "").trim();
+      if (!value) return "";
+      try {
+        const parsed = new URL(value, window.location.href);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "mailto:") {
+          return parsed.href;
+        }
+      } catch {
+        return "";
+      }
+      return "";
+    }
+
+    const MARKDOWN_SANITIZE_CONFIG = {
+      ALLOWED_TAGS: ["a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "li", "ol", "p", "pre", "span", "strong", "table", "tbody", "td", "th", "thead", "tr", "ul"],
+      ALLOWED_ATTR: ["class", "href", "title"],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+      FORBID_TAGS: ["img", "script", "style", "svg", "math", "iframe", "object", "embed", "form", "input", "button"],
+      RETURN_TRUSTED_TYPE: false
+    };
+
+    function markdownParser() {
+      if (!window.marked) return null;
+      return window.marked.marked || window.marked.parse || window.marked;
+    }
+
+    function sanitizeMarkdownHtml(html) {
+      if (!window.DOMPurify || typeof window.DOMPurify.sanitize !== "function") {
+        throw new Error("DOMPurify is not loaded");
+      }
+      return window.DOMPurify.sanitize(html, MARKDOWN_SANITIZE_CONFIG);
+    }
+
+    function hardenMarkdownLinks(root) {
+      root.querySelectorAll("a[href]").forEach(link => {
+        const href = normalizeMarkdownUrl(link.getAttribute("href"));
+        if (!href) {
+          link.removeAttribute("href");
+          link.removeAttribute("target");
+          link.removeAttribute("rel");
+          return;
+        }
+        link.setAttribute("href", href);
+        link.setAttribute("target", "_blank");
+        link.setAttribute("rel", "noopener noreferrer");
+      });
+    }
+
+    function normalizeMarkdownCodeLanguage(value) {
+      const raw = String(value ?? "").trim().toLowerCase();
+      if (!raw) return "";
+      return MARKDOWN_CODE_LANGUAGE_ALIASES.get(raw) || "";
+    }
+
+    function displayMarkdownCodeLanguage(value, normalized) {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "code";
+      if (normalized === "xml" && raw.toLowerCase() === "html") return "html";
+      return raw;
+    }
+
+    function sanitizeHighlightClasses(root) {
+      root.querySelectorAll("[class]").forEach(node => {
+        const allowed = Array.from(node.classList).filter(name =>
+          name === "hljs" || /^hljs-[a-z0-9_-]+$/i.test(name));
+        if (allowed.length) {
+          node.className = allowed.join(" ");
+        } else {
+          node.removeAttribute("class");
+        }
+      });
+    }
+
+    function highlightMarkdownCode(code, language) {
+      const normalized = normalizeMarkdownCodeLanguage(language);
+      if (!normalized || !window.hljs || typeof window.hljs.highlight !== "function" || typeof window.hljs.getLanguage !== "function") {
+        return "";
+      }
+
+      try {
+        if (!window.hljs.getLanguage(normalized)) return "";
+        const highlighted = window.hljs.highlight(code.textContent || "", {
+          language: normalized,
+          ignoreIllegals: true
+        }).value;
+        code.innerHTML = sanitizeMarkdownHtml(highlighted);
+        code.classList.add("hljs");
+        code.classList.add("language-" + normalized);
+        sanitizeHighlightClasses(code);
+        return normalized;
+      } catch {
+        code.textContent = code.textContent || "";
+        return "";
+      }
+    }
+
+    function enhanceMarkdownCodeBlocks(root) {
+      root.querySelectorAll("pre").forEach(pre => {
+        if (pre.closest(".code-block")) return;
+        const code = pre.querySelector("code");
+        if (!code) return;
+        if (!code.id) code.id = "mdCode" + (++markdownCodeBlockId).toString(36);
+        const languageClass = Array.from(code.classList).find(name => name.startsWith("language-"));
+        const sourceLanguage = languageClass ? languageClass.slice("language-".length) : "";
+        const highlightedLanguage = highlightMarkdownCode(code, sourceLanguage);
+        const language = displayMarkdownCodeLanguage(sourceLanguage, highlightedLanguage);
+        const block = document.createElement("div");
+        block.className = "code-block";
+        const head = document.createElement("div");
+        head.className = "code-block-head";
+        const label = document.createElement("span");
+        label.className = "code-language";
+        label.textContent = language || "code";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "code-copy";
+        button.dataset.copyCode = code.id;
+        button.textContent = "Copy";
+        head.append(label, button);
+        pre.parentNode.insertBefore(block, pre);
+        block.append(head, pre);
+      });
+    }
+
+    function wrapMarkdownTables(root) {
+      root.querySelectorAll("table").forEach(table => {
+        if (table.closest(".markdown-table-wrap")) return;
+        const wrap = document.createElement("div");
+        wrap.className = "markdown-table-wrap";
+        table.parentNode.insertBefore(wrap, table);
+        wrap.appendChild(table);
+      });
+    }
+
+    function enhanceMarkdownHtml(html) {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = html;
+      hardenMarkdownLinks(wrapper);
+      enhanceMarkdownCodeBlocks(wrapper);
+      wrapMarkdownTables(wrapper);
+      return wrapper.innerHTML;
+    }
+
+    function renderMarkdownSafe(text) {
+      try {
+        const parser = markdownParser();
+        if (typeof parser !== "function") throw new Error("marked is not loaded");
+        const parsed = parser(String(text ?? ""), {
+          async: false,
+          breaks: false,
+          gfm: true,
+          silent: false
+        });
+        return enhanceMarkdownHtml(sanitizeMarkdownHtml(parsed));
+      } catch {
+        return escapeHtml(text);
+      }
+    }
+
+    function pretty(value) {
+      if (typeof value === "string") return value;
+      try { return JSON.stringify(value, null, 2); }
+      catch { return String(value); }
+    }
+
+    function preview(text, limit = 800) {
+      const value = String(text ?? "").replace(/\r/g, "\\r").replace(/\n/g, "\\n");
+      return value.length <= limit ? value : value.slice(0, limit) + "...";
+    }
+
+    function formatScalar(value) {
+      if (value === null || value === undefined || value === "") return "Unknown";
+      if (Array.isArray(value)) return value.join(", ") || "None";
+      if (typeof value === "object") return JSON.stringify(value);
+      return String(value);
+    }
+
+    function formatInteger(value) {
+      if (value === null || value === undefined || value === "") return "Unknown";
+      const number = Number(value);
+      if (!Number.isFinite(number)) return formatScalar(value);
+      return Math.round(number).toLocaleString();
+    }
+
+    function hasValue(value) {
+      return value !== null && value !== undefined && value !== "";
+    }
+
+    function formatTokenSource(value) {
+      if (!hasValue(value)) return "Unknown";
+      return String(value)
+        .replace(/_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function setOptionalMetric(container, valueNode, value, formatter = formatScalar) {
+      const visible = hasValue(value);
+      if (container) container.hidden = !visible;
+      if (valueNode) valueNode.textContent = visible ? formatter(value) : "Unknown";
+    }
+
+    function sumTokenParts(inputTokens, outputTokens) {
+      if (!hasValue(inputTokens) || !hasValue(outputTokens)) return null;
+      const input = Number(inputTokens);
+      const output = Number(outputTokens);
+      if (!Number.isFinite(input) || !Number.isFinite(output)) return null;
+      return input + output;
+    }
+
+    function roughDeltaSinceUsage(memory, usage) {
+      const currentRough = valueAt(memory, ["roughEstimatedTokens", "estimatedTokens"], null);
+      const roughAtRequest = valueAt(usage, ["roughEstimatedTokensAtRequest"], null);
+      if (!hasValue(currentRough) || !hasValue(roughAtRequest)) return null;
+      const current = Number(currentRough);
+      const previous = Number(roughAtRequest);
+      if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+      return Math.max(0, current - previous);
+    }
+
+    function turnLabel(turn) {
+      return hasValue(turn) ? "turn #" + formatScalar(turn) : "turn unknown";
+    }
+
+    function usageTurn(usage) {
+      return valueAt(usage, ["turn", "turnId"], null);
+    }
+
+    function actualUsageSnapshot(usage) {
+      if (!usage || typeof usage !== "object" || usage.usageAvailable === false) return null;
+      const total = valueAt(usage, ["totalTokens"], null);
+      const input = valueAt(usage, ["inputTokens"], null);
+      const output = valueAt(usage, ["outputTokens"], null);
+      if (!hasValue(total) || !hasValue(input) || !hasValue(output)) return null;
+      return {
+        total,
+        input,
+        output,
+        source: valueAt(usage, ["source"], "actual"),
+        turn: usageTurn(usage),
+        completedAt: valueAt(usage, ["completedAt"], null)
+      };
+    }
+
+    function formatConfirmedActualUsage(snapshot) {
+      const source = formatScalar(snapshot?.source || "actual");
+      const turn = snapshot ? usageTurn(snapshot) : null;
+      const sourceLabel = hasValue(turn) ? source + " " + turnLabel(turn) : source;
+      const total = formatInteger(snapshot?.total);
+      const input = formatInteger(snapshot?.input);
+      const output = formatInteger(snapshot?.output);
+      return {
+        value: total + " total",
+        note: "input " + input + " / output " + output + " · " + sourceLabel,
+        badgeLong: "Total Tokens " + total + " / input " + input + " / output " + output + " · " + sourceLabel,
+        badgeShort: "Total Tokens " + total
+      };
+    }
+
+    function lastConfirmedTurnNote() {
+      const turn = usageTurn(state.latestActualUsage);
+      return hasValue(turn) ? "last confirmed " + turnLabel(turn) : "last confirmed usage";
+    }
+
+    function waitingActualUsageNote(options = {}) {
+      if (state.latestActualUsage) {
+        return (options.currentTurnId ? "waiting for current turn usage" : "waiting for actual usage") + " · " + lastConfirmedTurnNote();
+      }
+      return options.currentTurnId ? "waiting for current turn usage" : "waiting for actual usage";
+    }
+
+    function formatActualUsage(usage, usageResult, options = {}) {
+      if (!usageResult?.success) {
+        if (state.latestActualUsage) {
+          const confirmed = formatConfirmedActualUsage(state.latestActualUsage);
+          return { ...confirmed, note: "usage refresh failed · " + lastConfirmedTurnNote() };
+        }
+        return { value: "", note: "" };
+      }
+      const snapshot = actualUsageSnapshot(usage);
+      if (snapshot) {
+        state.latestActualUsage = snapshot;
+        return formatConfirmedActualUsage(snapshot);
+      }
+      if (!usage || usage.usageAvailable === false || !snapshot) {
+        if (state.latestActualUsage) {
+          const confirmed = formatConfirmedActualUsage(state.latestActualUsage);
+          return { ...confirmed, note: waitingActualUsageNote(options) };
+        }
+        return { value: "", note: "" };
+      }
+
+      return { value: "", note: "" };
+    }
+
+    function applyActualUsageMetric(usage, usageResult, options = {}) {
+      const actualUsage = formatActualUsage(usage, usageResult, options);
+      el.metricUsage.textContent = actualUsage.value;
+      el.metricUsageNote.textContent = actualUsage.note;
+      if (el.tokenUsageBadge) el.tokenUsageBadge.hidden = !actualUsage.badgeShort;
+      if (el.tokenUsageLong) el.tokenUsageLong.textContent = actualUsage.badgeLong || "";
+      if (el.tokenUsageShort) el.tokenUsageShort.textContent = actualUsage.badgeShort || "";
+      return actualUsage;
+    }
+
+    function arrayify(value) {
+      if (Array.isArray(value)) return value;
+      if (!value || typeof value !== "object") return [];
+      for (const key of ["items", "loaded", "active", "available", "servers", "commands", "builtIn", "externalMcp", "tools"]) {
+        if (Array.isArray(value[key])) return value[key];
+      }
+      return [];
+    }
+
+    function valueAt(value, keys, fallback = "Unknown") {
+      for (const key of keys) {
+        const parts = String(key).split(".");
+        let current = value;
+        let ok = true;
+        for (const part of parts) {
+          if (part === "length" && Array.isArray(current)) {
+            current = current.length;
+            continue;
+          }
+          if (!current || typeof current !== "object" || !(part in current)) {
+            ok = false;
+            break;
+          }
+          current = current[part];
+        }
+        if (ok && current !== undefined && current !== null && current !== "") return current;
+      }
+      return fallback;
+    }
+
+    function writeJson(target, value) {
+      const node = typeof target === "string" ? document.querySelector("#" + target) : target;
+      if (!node) return;
+      const text = typeof value === "string" ? value : pretty(maskSecrets(value));
+      if (node.tagName === "TEXTAREA") node.value = text;
+      else node.textContent = text;
+    }
+
+    function readText(node) {
+      return node.tagName === "TEXTAREA" || node.tagName === "INPUT" ? node.value : node.textContent;
+    }
+
+    function updateTopStatus(text) {
+      if (el.topStatus) el.topStatus.textContent = text || "ready";
+    }
+
+    function setSettingsOpen(open) {
+      document.body.classList.toggle("settings-open", open);
+
+    }
+
+    function maskSecrets(value) {
+      if (typeof value === "string") {
+        return value
+          .replace(/(api[_-]?key|token|secret|password|credential)(\s*[:=]\s*)([^\s'"]+)/gi, "$1$2********")
+          .replace(/Bearer\s+[A-Za-z0-9._-]{12,}/gi, "Bearer ********")
+          .replace(/\b(sk|pk)-[A-Za-z0-9._-]{12,}/gi, "$1-********");
+      }
+      if (Array.isArray(value)) return value.map(maskSecrets);
+      if (value && typeof value === "object") {
+        const output = {};
+        for (const [key, item] of Object.entries(value)) {
+          output[key] = /apiKey|token|secret|password|credential/i.test(key) && typeof item === "string"
+            ? "********"
+            : maskSecrets(item);
+        }
+        return output;
+      }
+      return value;
+    }
+
+    function showError(info) {
+      const lines = [];
+      lines.push("kind: " + (info.kind || "request_failed"));
+      lines.push("error: " + (info.error || info.message || "Request failed."));
+      if (info.details !== undefined) lines.push("details: " + pretty(info.details));
+      if (info.status !== undefined) lines.push("status: " + info.status);
+      if (info.path) lines.push("path: " + info.path);
+      if (info.bodyPreview) lines.push("body preview: " + info.bodyPreview);
+      el.globalError.textContent = lines.join("\n");
+      el.globalError.classList.add("visible");
+    }
+
+    function clearError() {
+      el.globalError.classList.remove("visible");
+      el.globalError.textContent = "";
+    }
+
+    function setPending(path, on) {
+      if (on) state.pending.set(path, (state.pending.get(path) || 0) + 1);
+      else {
+        const next = (state.pending.get(path) || 1) - 1;
+        if (next <= 0) state.pending.delete(path);
+        else state.pending.set(path, next);
+      }
+      const pendingPaths = new Set(state.pending.keys());
+      document.querySelectorAll("button[data-endpoint]").forEach(button => {
+        const endpoint = button.dataset.endpoint;
+        button.disabled = pendingPaths.has(endpoint);
+      });
+      updateMessageAction();
+    }
+
+    function timeoutMs(kind) {
+      if (kind === "long") return 600000;
+      if (kind === "proxy") return 120000;
+      if (kind === "quick") return 15000;
+      return 60000;
+    }
+
+    async function request(path, options = {}) {
+      const method = (options.method || "GET").toUpperCase();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs(options.timeoutKind));
+      const headers = {};
+      let body = options.body;
+      if (body !== undefined && body !== null && typeof body !== "string") {
+        body = JSON.stringify(body);
+      }
+      if (body !== undefined && body !== null) headers["Content-Type"] = "application/json";
+
+      clearError();
+      setPending(path, true);
+      const startedAt = performance.now();
+      try {
+        const response = await fetch(endpointUrl(path), { method, headers, body, signal: controller.signal });
+        const rawText = await response.text();
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        let json = null;
+        let parseError = "";
+        if (rawText.trim()) {
+          try { json = JSON.parse(rawText); }
+          catch (error) { parseError = error.message; }
+        }
+
+        const expectsEnvelope = expectsEnvelopeFor(path);
+        const hasEnvelope = json && typeof json === "object" && typeof json.success === "boolean";
+        const result = {
+          path,
+          method,
+          status: response.status,
+          ok: response.ok,
+          elapsedMs,
+          rawText,
+          json,
+          parseError,
+          expectsEnvelope,
+          hasEnvelope,
+          envelope: hasEnvelope ? json : null,
+          data: hasEnvelope && json.success ? json.data : json,
+          success: false
+        };
+
+        if (!rawText.trim() && expectsEnvelope) {
+          result.kind = "empty_body";
+          result.error = "Expected a JSON success envelope, but the response body was empty.";
+        } else if (parseError && (expectsEnvelope || response.headers.get("content-type")?.includes("json"))) {
+          result.kind = "json_parse_failed";
+          result.error = parseError;
+        } else if (expectsEnvelope && !hasEnvelope) {
+          result.kind = "missing_success_envelope";
+          result.error = "Expected { success, data } or { success, kind, error }.";
+        } else if (hasEnvelope && json.success === false) {
+          result.kind = json.kind || "server_error";
+          result.error = json.error || "Server returned success=false.";
+          result.details = json.details;
+        } else if (!response.ok) {
+          result.kind = "http_error";
+          result.error = "HTTP " + response.status;
+        } else {
+          result.success = true;
+        }
+
+        state.lastByPath.set(method + " " + path, result);
+        el.lastRequest.textContent = method + " " + path + " " + response.status + " (" + elapsedMs + " ms)";
+        updateTopStatus(el.lastRequest.textContent);
+        if (!result.success) {
+          showError({
+            kind: result.kind,
+            error: result.error,
+            details: result.details,
+            status: result.status,
+            path: result.path,
+            bodyPreview: preview(rawText)
+          });
+        }
+        return result;
+      } catch (error) {
+        const result = {
+          path,
+          method,
+          status: 0,
+          ok: false,
+          rawText: "",
+          json: null,
+          success: false,
+          kind: error.name === "AbortError" ? "request_timeout" : "fetch_failed",
+          error: error.name === "AbortError" ? "Request timed out." : error.message
+        };
+        showError({ kind: result.kind, error: result.error, status: 0, path });
+        updateTopStatus(method + " " + path + " failed");
+        return result;
+      } finally {
+        clearTimeout(timer);
+        setPending(path, false);
+      }
+    }
+
+    function bodyOf(result) {
+      return result && result.hasEnvelope ? result.data : result?.json;
+    }
+
+    async function quietJsonRequest(path, timeoutKindName = "quick") {
+      const method = "GET";
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs(timeoutKindName));
+      const startedAt = performance.now();
+      try {
+        const response = await fetch(endpointUrl(path), { method, signal: controller.signal });
+        const rawText = await response.text();
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        let json = null;
+        let parseError = "";
+        if (rawText.trim()) {
+          try { json = JSON.parse(rawText); }
+          catch (error) { parseError = error.message; }
+        }
+        const hasEnvelope = json && typeof json === "object" && typeof json.success === "boolean";
+        const result = {
+          path,
+          method,
+          status: response.status,
+          ok: response.ok,
+          elapsedMs,
+          rawText,
+          json,
+          parseError,
+          expectsEnvelope: true,
+          hasEnvelope,
+          envelope: hasEnvelope ? json : null,
+          data: hasEnvelope && json.success ? json.data : json,
+          success: false
+        };
+        if (!rawText.trim()) {
+          result.kind = "empty_body";
+          result.error = "Expected a JSON success envelope, but the response body was empty.";
+        } else if (parseError) {
+          result.kind = "json_parse_failed";
+          result.error = parseError;
+        } else if (!hasEnvelope) {
+          result.kind = "missing_success_envelope";
+          result.error = "Expected { success, data } or { success, kind, error }.";
+        } else if (json.success === false) {
+          result.kind = json.kind || "server_error";
+          result.error = json.error || "Server returned success=false.";
+          result.details = json.details;
+        } else if (!response.ok) {
+          result.kind = "http_error";
+          result.error = "HTTP " + response.status;
+        } else {
+          result.success = true;
+        }
+        return result;
+      } catch (error) {
+        return {
+          path,
+          method,
+          status: 0,
+          ok: false,
+          rawText: "",
+          json: null,
+          success: false,
+          kind: error.name === "AbortError" ? "request_timeout" : "fetch_failed",
+          error: error.name === "AbortError" ? "Request timed out." : error.message
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function quietUsageRequest() {
+      const path = "/usage";
+      const method = "GET";
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs("quick"));
+      const startedAt = performance.now();
+      try {
+        const response = await fetch(endpointUrl(path), { method, signal: controller.signal });
+        const rawText = await response.text();
+        const elapsedMs = Math.round(performance.now() - startedAt);
+        let json = null;
+        let parseError = "";
+        if (rawText.trim()) {
+          try { json = JSON.parse(rawText); }
+          catch (error) { parseError = error.message; }
+        }
+        const hasEnvelope = json && typeof json === "object" && typeof json.success === "boolean";
+        const result = {
+          path,
+          method,
+          status: response.status,
+          ok: response.ok,
+          elapsedMs,
+          rawText,
+          json,
+          parseError,
+          expectsEnvelope: true,
+          hasEnvelope,
+          envelope: hasEnvelope ? json : null,
+          data: hasEnvelope && json.success ? json.data : json,
+          success: false
+        };
+        if (!rawText.trim()) {
+          result.kind = "empty_body";
+          result.error = "Expected a JSON success envelope, but the response body was empty.";
+        } else if (parseError) {
+          result.kind = "json_parse_failed";
+          result.error = parseError;
+        } else if (!hasEnvelope) {
+          result.kind = "missing_success_envelope";
+          result.error = "Expected { success, data } or { success, kind, error }.";
+        } else if (json.success === false) {
+          result.kind = json.kind || "server_error";
+          result.error = json.error || "Server returned success=false.";
+          result.details = json.details;
+        } else if (!response.ok) {
+          result.kind = "http_error";
+          result.error = "HTTP " + response.status;
+        } else {
+          result.success = true;
+        }
+        return result;
+      } catch (error) {
+        return {
+          path,
+          method,
+          status: 0,
+          ok: false,
+          rawText: "",
+          json: null,
+          success: false,
+          kind: error.name === "AbortError" ? "request_timeout" : "fetch_failed",
+          error: error.name === "AbortError" ? "Request timed out." : error.message
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function refreshActualUsageMetric(options = {}) {
+      if (state.usageRefreshInFlight) return null;
+      state.usageRefreshInFlight = true;
+      try {
+        const result = await quietUsageRequest();
+        const usage = bodyOf(result) || {};
+        return applyActualUsageMetric(usage, result, options);
+      } catch {
+        return null;
+      } finally {
+        state.usageRefreshInFlight = false;
+      }
+    }
+
+    async function loadOpenApi() {
+      const result = await request("/openapi.json", { timeoutKind: "quick" });
+      if (!result.success || !result.json || !result.json.paths) {
+        state.spec = null;
+        state.operations = createFallbackOperations();
+        el.specStatus.textContent = "fallback";
+        updateTopStatus("OpenAPI fallback");
+        el.metricOpenApi.textContent = "Fallback";
+        renderOperations();
+        renderDevWarnings();
+        return false;
+      }
+      state.spec = result.json;
+      state.operations = parseOperations(result.json);
+      const serverUrl = result.json.servers?.[0]?.url;
+      if (serverUrl) el.baseUrl.value = serverUrl.replace(/\/+$/, "");
+      el.specStatus.textContent = state.operations.length + " operations";
+      el.metricOpenApi.textContent = "Loaded";
+      el.lastRefresh.textContent = nowLabel();
+      updateTopStatus("OpenAPI loaded · " + el.lastRefresh.textContent);
+      renderOperations();
+      renderDevWarnings();
+      return true;
+    }
+
+    function parseOperations(spec) {
+      const output = [];
+      const methodNames = new Set(["get", "post", "put", "patch", "delete"]);
+      for (const [path, methods] of Object.entries(spec.paths || {})) {
+        for (const [method, operation] of Object.entries(methods || {})) {
+          if (!methodNames.has(method.toLowerCase())) continue;
+          const httpMethod = method.toUpperCase();
+          const tags = Array.isArray(operation.tags) ? operation.tags : ["control"];
+          const key = operation.operationId || httpMethod + " " + path;
+          output.push({
+            key,
+            path,
+            method: httpMethod,
+            tags,
+            tag: tags[0] || "control",
+            summary: operation.summary || "",
+            description: operation.description || "",
+            parameters: operation.parameters || [],
+            requestBody: operation.requestBody || null,
+            expectsEnvelope: expectsEnvelopeFor(path),
+            dedicated: DEDICATED_ENDPOINTS.has(path)
+          });
+        }
+      }
+      return output.sort((a, b) => (a.tag + a.path + a.method).localeCompare(b.tag + b.path + b.method));
+    }
+
+    function createFallbackOperations() {
+      return ["/health", "/config", "/proxy", "/memory"].map(path => ({
+        key: "GET " + path,
+        path,
+        method: "GET",
+        tags: ["fallback"],
+        tag: "fallback",
+        summary: "Fallback " + path,
+        description: "",
+        parameters: [],
+        requestBody: null,
+        expectsEnvelope: true,
+        dedicated: DEDICATED_ENDPOINTS.has(path)
+      }));
+    }
+
+    function findOperation(path, method = "GET") {
+      return state.operations.find(op => op.path === path && op.method === method.toUpperCase());
+    }
+
+    function assertOperation(path, method = "GET") {
+      if (!findOperation(path, method)) {
+        console.warn("Dedicated UI endpoint is missing from OpenAPI spec:", method, path);
+      }
+    }
+
+    function renderDevWarnings() {
+      const missing = [];
+      for (const endpoint of DEDICATED_ENDPOINTS) {
+        const method = endpoint === "/proxy/config" && findOperation(endpoint, "PUT") ? "GET" : undefined;
+        const has = state.operations.some(op => op.path === endpoint);
+        if (!has) missing.push(endpoint);
+        if (method) void method;
+      }
+      if (!missing.length) {
+        el.devWarning.hidden = true;
+        el.devWarning.textContent = "";
+        return;
+      }
+      el.devWarning.hidden = false;
+      el.devWarning.textContent = "OpenAPI warning: dedicated UI endpoint(s) missing from spec: " + missing.join(", ");
+    }
+
+    function renderRows(target, rows) {
+      target.innerHTML = rows.map(([name, value]) =>
+        "<tr><th>" + escapeHtml(name) + "</th><td>" + escapeHtml(formatScalar(value)) + "</td></tr>"
+      ).join("");
+    }
+
+    async function loadStatus() {
+      ["/health", "/config", "/context", "/usage", "/proxy", "/memory"].forEach(path => assertOperation(path));
+      const [healthResult, configResult, contextResult, usageResult, proxyResult, memoryResult] = await Promise.all([
+        request("/health", { timeoutKind: "quick" }),
+        request("/config", { timeoutKind: "quick" }),
+        request("/context", { timeoutKind: "quick" }),
+        request("/usage", { timeoutKind: "quick" }),
+        request("/proxy", { timeoutKind: "quick" }),
+        request("/memory", { timeoutKind: "quick" })
+      ]);
+      const health = bodyOf(healthResult) || {};
+      const config = bodyOf(configResult) || {};
+      const context = bodyOf(contextResult) || {};
+      const usage = bodyOf(usageResult) || {};
+      const proxy = bodyOf(proxyResult) || {};
+      const memory = bodyOf(memoryResult) || {};
+      const actualUsage = applyActualUsageMetric(usage, usageResult, { currentTurnId: state.activeTurnId });
+      el.metricHealth.textContent = formatScalar(valueAt(health, ["status", "service"], healthResult.success ? "OK" : "Failed"));
+      el.metricControlUrl.textContent = formatScalar(valueAt(health, ["controlUrl"], baseUrl()));
+      el.metricProxy.textContent = formatScalar(valueAt(proxy, ["status.mode", "mode", "health.status", "health"], proxyResult.success ? "OK" : "Failed"));
+      el.metricModel.textContent = formatScalar(valueAt(context, ["model", "defaultModel"], valueAt(config, ["model", "proxy.defaultModel"], "proxy-default")));
+      el.metricMemory.textContent = formatScalar(valueAt(memory, ["required", "options.enabled", "enabled"], "Unknown"));
+      const statusRows = [
+        ["controlUrl", valueAt(health, ["controlUrl"], baseUrl())],
+        ["localhostOnly", valueAt(health, ["localhostOnly"], "Unknown")],
+        ["proxyUrl", valueAt(config, ["proxyUrl", "proxy.url", "proxy.baseUrl"], "Unknown")],
+        ["skillsRoot", valueAt(config, ["skillsRoot"], "Unknown")],
+        ["mcpServersRoot", valueAt(config, ["mcpServersRoot"], "Unknown")],
+        ["roughInputTokens", valueAt(context, ["roughInputTokens"], "Unknown")],
+        ["latestActualUsage", actualUsage.value],
+        ["memoryRoughEstimatedTokens", valueAt(memory, ["roughEstimatedTokens", "estimatedTokens"], "Unknown")],
+        ["memoryReason", valueAt(memory, ["reason"], "Unknown")]
+      ];
+      const statusTriggerTokens = valueAt(memory, ["triggerTokenCount"], null);
+      const statusTriggerSource = valueAt(memory, ["triggerTokenSource"], null);
+      const statusTriggerThreshold = valueAt(memory, ["options.triggerEstimatedTokens"], null);
+      if (hasValue(statusTriggerTokens)) statusRows.splice(statusRows.length - 1, 0, ["memoryTriggerTokens", statusTriggerTokens]);
+      if (hasValue(statusTriggerSource)) statusRows.splice(statusRows.length - 1, 0, ["memoryTriggerSource", formatTokenSource(statusTriggerSource)]);
+      if (hasValue(statusTriggerThreshold)) statusRows.splice(statusRows.length - 1, 0, ["memoryTriggerThreshold", statusTriggerThreshold]);
+      renderRows(el.statusTable, statusRows);
+      writeJson(el.statusJson, { health, config, context, usage, proxy, memory });
+      el.lastRefresh.textContent = nowLabel();
+      updateTopStatus("Status refreshed · " + el.lastRefresh.textContent);
+    }
+
+    async function loadJsonInto(path, target) {
+      const result = await request(path);
+      writeJson(target, result.hasEnvelope ? result.data : result.json || result);
+    }
+
+    function assistantTextFrom(data) {
+      return data?.assistant || data?.message || data?.text || "No assistant text returned.";
+    }
+
+    function safeParseJsonObject(value) {
+      if (value && typeof value === "object" && !Array.isArray(value)) return value;
+      if (typeof value !== "string" || !value.trim()) return null;
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function messageContentText(content) {
+      if (content == null) return "";
+      if (typeof content === "string") return content;
+      if (Array.isArray(content)) {
+        return content.map(part => {
+          if (typeof part === "string") return part;
+          if (!part || typeof part !== "object") return "";
+          if (typeof part.text === "string") return part.text;
+          if (typeof part.content === "string") return part.content;
+          return "";
+        }).filter(Boolean).join("\n");
+      }
+      return String(content);
+    }
+
+    function cleanToolSummary(value) {
+      const text = String(value ?? "")
+        .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
+        .replace(/[\u0000-\u001F\u007F-\u009F]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return text.length > 80 ? text.slice(0, 77).trimEnd() + "..." : text;
+    }
+
+    function cleanToolEmoji(value) {
+      const text = cleanToolSummary(value);
+      return text ? Array.from(text)[0] : "🔧";
+    }
+
+    function toolDisplayFromArguments(toolName, argumentsJson) {
+      const args = safeParseJsonObject(argumentsJson);
+      const fallbackSummary = cleanToolSummary(toolName ? toolName + " 실행" : "Tool call") || "Tool call";
+      return {
+        summary: cleanToolSummary(args?._jio_display_summary) || fallbackSummary,
+        emoji: cleanToolEmoji(args?._jio_display_emoji)
+      };
+    }
+
+    function errorTextFromToolContent(content) {
+      const parsed = safeParseJsonObject(content);
+      if (!parsed || !Object.prototype.hasOwnProperty.call(parsed, "error")) return "";
+      const error = parsed.error;
+      if (typeof error === "string") return cleanToolSummary(error);
+      if (error && typeof error === "object") {
+        return cleanToolSummary(error.message || error.Message || error.code || error.Code || "Tool returned an error.");
+      }
+      return cleanToolSummary(error) || "Tool returned an error.";
+    }
+
+    function displaySafeEventError(event) {
+      const raw = event?.error || "";
+      const parsedError = errorTextFromToolContent(raw);
+      if (parsedError) return parsedError;
+      const parsed = safeParseJsonObject(raw);
+      if (parsed) {
+        return cleanToolSummary(parsed.message || parsed.Message || parsed.kind || parsed.Kind || "Tool failed.");
+      }
+      return cleanToolSummary(raw);
+    }
+
+    function toolCallsOf(message) {
+      const calls = message?.tool_calls || message?.toolCalls || message?.ToolCalls;
+      return Array.isArray(calls) ? calls : [];
+    }
+
+    function toolCallIdOfCall(call) {
+      return call?.id || call?.Id || call?.tool_call_id || call?.toolCallId || call?.ToolCallId || "";
+    }
+
+    function toolCallIdOf(message) {
+      return message?.tool_call_id || message?.toolCallId || message?.ToolCallId || "";
+    }
+
+    function toolCallNameOf(call) {
+      return call?.function?.name || call?.Function?.Name || call?.name || call?.Name || "tool";
+    }
+
+    function toolCallArgumentsOf(call) {
+      return call?.function?.arguments ?? call?.Function?.Arguments ?? call?.arguments ?? call?.Arguments ?? "";
+    }
+
+    function restoreChatMessagesFromPayloadMessages(messages) {
+      const restored = [];
+      const pendingToolEvents = new Map();
+      let sequence = 0;
+
+      for (const message of Array.isArray(messages) ? messages : []) {
+        const role = String(message?.role || message?.Role || "").toLowerCase();
+        if (role === "user") {
+          restored.push({ role: "user", text: messageContentText(message.content ?? message.Content) });
+          continue;
+        }
+
+        if (role === "assistant") {
+          const text = messageContentText(message.content ?? message.Content);
+          const timeline = [];
+          const calls = toolCallsOf(message);
+          if (text && calls.length) {
+            timeline.push({
+              sequence: ++sequence,
+              type: "assistant_message_before_tool_calls",
+              status: "success",
+              content: text,
+              emoji: "💬",
+              summary: "Assistant prepared tool calls"
+            });
+          }
+          for (const call of calls) {
+            const toolName = toolCallNameOf(call);
+            const argumentsJson = toolCallArgumentsOf(call) || "{}";
+            const display = toolDisplayFromArguments(toolName, argumentsJson);
+            const callId = toolCallIdOfCall(call);
+            const event = {
+              sequence: ++sequence,
+              type: "tool_call_started",
+              status: "running",
+              toolCallId: callId,
+              toolName,
+              emoji: display.emoji,
+              summary: display.summary
+            };
+            timeline.push(event);
+            if (callId) pendingToolEvents.set(callId, event);
+          }
+          if (text || timeline.length) restored.push({ role: "assistant", text: calls.length ? "" : text, timeline });
+          continue;
+        }
+
+        if (role === "tool") {
+          const toolCallId = toolCallIdOf(message);
+          const event = toolCallId ? pendingToolEvents.get(toolCallId) : null;
+          if (!event) continue;
+          const error = errorTextFromToolContent(message.content ?? message.Content);
+          event.type = error ? "tool_call_failed" : "tool_call_succeeded";
+          event.status = error ? "failed" : "success";
+          event.error = error || null;
+          pendingToolEvents.delete(toolCallId);
+        }
+      }
+
+      for (const event of pendingToolEvents.values()) {
+        event.type = "tool_call_failed";
+        event.status = "failed";
+        event.error = "Tool result missing from payload.";
+      }
+
+      return restored;
+    }
+
+    function payloadMessagesFromData(data) {
+      return data?.payload?.messages || data?.messages || [];
+    }
+
+    function payloadMessagesSignature(messages) {
+      try {
+        return JSON.stringify(Array.isArray(messages) ? messages : []);
+      } catch {
+        return "";
+      }
+    }
+
+    function applyPayloadChatMessages(messages, options = {}) {
+      const signature = payloadMessagesSignature(messages);
+      if (!options.force && signature === state.chatPayloadSignature) return false;
+      const restored = restoreChatMessagesFromPayloadMessages(messages);
+      state.chatPayloadSignature = signature;
+      if (!restored.length && !state.chatMessages.length) return false;
+      state.chatMessages = restored;
+      renderChatMessages();
+      return true;
+    }
+
+    async function restoreChatFromPayload() {
+      if (state.chatMessages.length || state.activeTurnId || state.pending.has("/turns")) return;
+      try {
+        const result = await request("/payload/json", { timeoutKind: "quick" });
+        const data = bodyOf(result) || {};
+        const changed = applyPayloadChatMessages(payloadMessagesFromData(data), { force: true });
+        if (changed) void refreshActualUsageMetric({ currentTurnId: state.activeTurnId });
+      } catch (error) {
+        showError({ kind: "chat_restore_failed", error: error.message, path: "/payload/json", status: 0 });
+      }
+    }
+
+    async function syncChatFromPayload(options = {}) {
+      if (state.activeTurnId || state.pending.has("/turns")) return false;
+      const result = await quietJsonRequest("/payload/json", "quick");
+      if (!result.success) return false;
+      const data = bodyOf(result) || {};
+      const changed = applyPayloadChatMessages(payloadMessagesFromData(data), options);
+      if (changed || options.force) void refreshActualUsageMetric({ currentTurnId: state.activeTurnId });
+      return changed;
+    }
+
+    function renderExternalTurnRunningState() {
+      const chatFirst = document.querySelector(".chat-first");
+      if (chatFirst) chatFirst.classList.toggle("external-turn-running", state.externalTurnRunning);
+      if (el.externalTurnOverlay) el.externalTurnOverlay.setAttribute("aria-hidden", state.externalTurnRunning ? "false" : "true");
+      if (el.message) el.message.disabled = state.externalTurnRunning;
+      updateMessageAction();
+      updateComposerBottomSpace();
+    }
+
+    async function runChatSyncTick(options = {}) {
+      if (state.chatSyncInFlight || document.hidden) return;
+      state.chatSyncInFlight = true;
+      try {
+        const statusResult = await quietJsonRequest("/status", "quick");
+        const status = bodyOf(statusResult) || {};
+        let externalRunning = state.externalTurnRunning;
+        let changed = false;
+        if (statusResult.success) {
+          externalRunning = Boolean(status.turnRunning && !state.activeTurnId);
+          changed = externalRunning !== state.externalTurnRunning;
+          if (changed) {
+            state.externalTurnRunning = externalRunning;
+            renderExternalTurnRunningState();
+          }
+        }
+
+        if (!state.activeTurnId) {
+          await syncChatFromPayload({ force: changed && !externalRunning });
+        }
+      } finally {
+        state.chatSyncInFlight = false;
+      }
+    }
+
+    function startChatSyncTimer() {
+      if (state.chatSyncTimerId) return;
+      state.chatSyncTimerId = window.setInterval(() => void runChatSyncTick(), 3500);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) void runChatSyncTick({ forcePayload: true });
+      });
+      void runChatSyncTick({ forcePayload: true });
+    }
+
+    function finalEventText(events) {
+      const finals = (Array.isArray(events) ? events : []).filter(event => event.type === "assistant_final" && event.content);
+      return finals.length ? finals[finals.length - 1].content : "";
+    }
+
+    function terminalTimelineText(events) {
+      const timeline = Array.isArray(events) ? events : [];
+      for (let index = timeline.length - 1; index >= 0; index--) {
+        const event = timeline[index] || {};
+        const type = event.type || "";
+        const status = event.status || "";
+        const error = displaySafeEventError(event);
+        if (type === "turn_canceled") return error || "Turn canceled.";
+        if (type === "turn_failed") return error || "Turn failed.";
+        if (type === "runtime_error") return error || "Runtime error.";
+        if (type === "tool_call_failed") return error || "Tool call failed.";
+        if (type === "turn_completed" && status === "failed") return error || event.summary || "Turn failed.";
+      }
+      return "";
+    }
+
+    function scrollChatToEnd() {
+      if (el.chatLog) el.chatLog.scrollTop = el.chatLog.scrollHeight;
+    }
+
+    function isChatNearBottom(threshold = 48) {
+      if (!el.chatLog) return true;
+      return el.chatLog.scrollHeight - el.chatLog.scrollTop - el.chatLog.clientHeight <= threshold;
+    }
+
+    function setChatLog(html, options = {}) {
+      if (!el.chatLog) return;
+      const previousScrollHeight = el.chatLog.scrollHeight;
+      const previousScrollTop = el.chatLog.scrollTop;
+      const shouldFollow = options.forceScroll || isChatNearBottom();
+      el.chatLog.innerHTML = html || "";
+      if (shouldFollow) {
+        scrollChatToEnd();
+      } else {
+        el.chatLog.scrollTop = previousScrollTop + (el.chatLog.scrollHeight - previousScrollHeight);
+      }
+    }
+
+    function renderActivityTimeline(timeline) {
+      const events = Array.isArray(timeline) ? timeline : [];
+      const visible = events.filter(event => {
+        const type = event.type || "";
+        return type === "tool_call_succeeded"
+          || type === "tool_call_failed"
+          || type === "tool_call_started"
+          || type === "assistant_message_before_tool_calls"
+          || type === "runtime_error"
+          || type === "turn_canceled"
+          || type === "turn_failed"
+          || (type === "turn_completed" && event.status === "failed");
+      }).filter((event, index, all) => {
+        if (event.type !== "tool_call_started") return true;
+        const toolCallId = event.toolCallId || event.tool_call_id || event.ToolCallId || "";
+        return !all.some(later =>
+          later !== event
+          && (later.type === "tool_call_succeeded" || later.type === "tool_call_failed")
+          && (toolCallId
+            ? (later.toolCallId || later.tool_call_id || later.ToolCallId || "") === toolCallId
+            : later.toolName === event.toolName)
+          && Number(later.sequence || 0) > Number(event.sequence || 0));
+      });
+      if (!visible.length) return "";
+      return "<div class=\"activity-stack\">" + visible.map(event => {
+        if (event.type === "assistant_message_before_tool_calls") {
+          const content = event.content || "";
+          return content
+            ? "<div class=\"bubble markdown\">" + renderMarkdownSafe(content) + "</div>"
+            : "";
+        }
+        const status = event.status || "running";
+        const summary = event.summary || event.toolName || event.type || "Activity";
+        const eventError = displaySafeEventError(event);
+        const error = eventError ? "<span class=\"activity-tool\">" + escapeHtml(eventError) + "</span>" : "";
+        const tool = event.toolName ? "<span class=\"activity-tool mono\">" + escapeHtml(event.toolName) + "</span>" : "";
+        const toolCallId = event.toolCallId || event.tool_call_id || event.ToolCallId || "";
+        const toolAttrs = toolCallId
+          ? " data-tool-call-id=\"" + escapeAttr(toolCallId) + "\" data-tool-result-state=\"" + escapeAttr(status) + "\""
+          : "";
+        return "<div class=\"activity-row " + escapeHtml(status) + "\"" + toolAttrs + "><span>" + escapeHtml(event.emoji || "•") + "</span><span class=\"activity-summary\">" + escapeHtml(summary) + tool + error + "</span><span class=\"activity-status\">" + escapeHtml(status) + "</span></div>";
+      }).join("") + "</div>";
+    }
+
+    function shouldShowTyping(message) {
+      if (!message || message.role !== "assistant" || message.text) return false;
+      const events = Array.isArray(message.timeline) ? message.timeline : [];
+      const relevant = events.filter(event => {
+        const type = event.type || "";
+        return type === "llm_wait_started"
+          || type === "llm_wait_completed"
+          || type === "assistant_message_before_tool_calls"
+          || type === "assistant_final"
+          || type === "tool_call_started"
+          || type === "tool_call_succeeded"
+          || type === "tool_call_failed"
+          || type === "turn_failed"
+          || type === "turn_canceled"
+          || type === "turn_completed";
+      });
+      const last = relevant.length ? relevant[relevant.length - 1] : null;
+      if (!last) return state.activeTurnMessage === message;
+      return last.type === "llm_wait_started" || last.type === "llm_wait_completed";
+    }
+
+    function renderTypingIndicator(label) {
+      return "<div class=\"bubble typing-bubble\" aria-label=\"" + escapeAttr(label || "Assistant is typing") + "\"><span></span><span></span><span></span></div>";
+    }
+
+    function renderPromptAssistantQuestions(message) {
+      const questions = Array.isArray(message.promptAssistantQuestions) ? message.promptAssistantQuestions : [];
+      if (!questions.length) return "";
+      const fields = questions.map(question => {
+        const id = escapeAttr(question.id || "");
+        const text = escapeHtml(question.text || "");
+        const questionText = escapeAttr(question.text || "");
+        return "<label>" + text + "<textarea data-prompt-assistant-question-id=\"" + id + "\" data-prompt-assistant-question-text=\"" + questionText + "\" spellcheck=\"true\"></textarea></label>";
+      }).join("");
+      return "<div class=\"bubble brief-question-bubble\"><div class=\"brief-question-list\">" + fields + "</div><div class=\"brief-question-actions\"><button class=\"primary\" type=\"button\" data-prompt-assistant-generate>Generate</button></div></div>";
+    }
+
+    function renderChatMessages(options = {}) {
+      if (!state.chatMessages.length) {
+        setChatLog("", options);
+        return;
+      }
+      setChatLog(state.chatMessages.map(message => {
+        const role = message.role === "user" ? "user" : "assistant";
+        const activity = role === "assistant" ? renderActivityTimeline(message.timeline) : "";
+        const typing = shouldShowTyping(message) ? renderTypingIndicator("Assistant is typing") : "";
+        const userTyping = role === "user" && message.promptAssistantUserTyping
+          ? renderTypingIndicator("Prompt Assistant is generating the refined prompt")
+          : "";
+        const promptAssistantQuestions = role === "assistant" ? renderPromptAssistantQuestions(message) : "";
+        const renderedText = role === "assistant" ? renderMarkdownSafe(message.text) : escapeHtml(message.text);
+        const text = message.text && !message.promptAssistantUserTyping ? "<div class=\"bubble" + (role === "assistant" ? " markdown" : "") + "\">" + renderedText + "</div>" : "";
+        return "<article class=\"chat-message " + role + "\"><div class=\"message-body\">" + activity + typing + userTyping + promptAssistantQuestions + text + "</div></article>";
+      }).join(""), options);
+    }
+
+    async function readTurnEvents(turnId, onEvent) {
+      const response = await fetch(endpointUrl("/turns/" + encodeURIComponent(turnId) + "/events"), {
+        method: "GET",
+        headers: { "Accept": "text/event-stream" }
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error("SSE stream failed with HTTP " + response.status + ": " + preview(text));
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        let boundary;
+        while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const data = frame.split("\n")
+            .filter(line => line.startsWith("data:"))
+            .map(line => line.slice(5).trimStart())
+            .join("\n");
+          if (!data) continue;
+          const event = JSON.parse(data);
+          onEvent(event);
+          if (event.type === "turn_completed" || event.type === "turn_failed" || event.type === "turn_canceled") {
+            return;
+          }
+        }
+      }
+    }
+
+    function isFinalUsageRefreshEvent(event) {
+      return event?.type === "assistant_final"
+        || event?.type === "turn_completed"
+        || event?.type === "turn_failed"
+        || event?.type === "turn_canceled";
+    }
+
+    function openOperations(viewName) {
+      document.body.classList.add("ops-open");
+      if (viewName) void setView(viewName);
+    }
+
+    function closeOperations() {
+      document.body.classList.remove("ops-open");
+    }
+
+    function createWaitingAssistant(summary) {
+      return {
+        role: "assistant",
+        text: "",
+        timeline: [{ type: "llm_wait_started", status: "running", emoji: "⏳", summary }]
+      };
+    }
+
+    function restoreDraftFactory(draft) {
+      return () => {
+        if (el.message.value === "") {
+          el.message.value = draft;
+          resizeMessageComposer();
+        }
+      };
+    }
+
+    async function startRealtimeTurn(message, draft, pendingAssistant, restoreDraftIfEmpty) {
+      const result = await request("/turns", {
+        method: "POST",
+        body: { message, continueAfterCancel: true },
+        timeoutKind: "quick"
+      });
+      writeJson(el.chatJson, result);
+      const data = bodyOf(result);
+      if (!result.success || !data?.turnId) {
+        restoreDraftIfEmpty();
+        el.assistantText.classList.add("muted");
+        el.assistantText.textContent = "Request failed. See the error box or diagnostics.";
+        pendingAssistant.text = result.error || "Request failed.";
+        pendingAssistant.timeline = [];
+        pendingAssistant.raw = result;
+        pendingAssistant.rawId = "chatRaw" + state.chatMessages.length;
+        renderChatMessages();
+        return;
+      }
+
+      state.activeTurnId = data.turnId;
+      state.activeTurnMessage = pendingAssistant;
+      updateMessageAction();
+      el.message.value = "";
+      resizeMessageComposer();
+      pendingAssistant.raw = result;
+      pendingAssistant.rawId = "chatRaw" + state.chatMessages.length;
+      setPending("/turns", true);
+      try {
+        await readTurnEvents(data.turnId, event => {
+          const usageRefreshOptions = { currentTurnId: data.turnId };
+          void refreshActualUsageMetric(usageRefreshOptions);
+          if (isFinalUsageRefreshEvent(event)) {
+            setTimeout(() => void refreshActualUsageMetric(usageRefreshOptions), 250);
+          }
+
+          pendingAssistant.timeline = pendingAssistant.timeline || [];
+          pendingAssistant.timeline.push(event);
+          if (event.type === "assistant_final" && event.content) {
+            pendingAssistant.text = event.content;
+            el.assistantText.classList.remove("muted");
+            el.assistantText.textContent = event.content;
+          } else if (event.type === "turn_failed") {
+            pendingAssistant.text = event.error || "Turn failed.";
+          } else if (event.type === "turn_canceled") {
+            pendingAssistant.text = "Turn canceled.";
+          }
+
+          if (event.type === "turn_completed") {
+            const text = finalEventText(pendingAssistant.timeline);
+            const terminalText = terminalTimelineText(pendingAssistant.timeline);
+            pendingAssistant.text = text || terminalText || pendingAssistant.text || "Completed.";
+            el.message.value = "";
+            resizeMessageComposer();
+          } else if (event.type === "turn_failed") {
+            restoreDraftIfEmpty();
+          } else if (event.type === "turn_canceled") {
+            restoreDraftIfEmpty();
+          }
+
+          writeJson(el.chatJson, { turnId: data.turnId, event, events: pendingAssistant.timeline });
+          renderChatMessages();
+        });
+        await refreshActualUsageMetric({ currentTurnId: data.turnId });
+      } catch (error) {
+        showError({ kind: "sse_failed", error: error.message, path: "/turns/" + data.turnId + "/events", status: 0 });
+        pendingAssistant.text = error.message;
+        restoreDraftIfEmpty();
+        renderChatMessages();
+      } finally {
+        setPending("/turns", false);
+        state.activeTurnId = "";
+        state.activeTurnMessage = null;
+        updateMessageAction();
+      }
+    }
+
+    async function sendMessage() {
+      const draft = el.message.value;
+      const message = draft.trim();
+      if (!message) {
+        showError({ kind: "invalid_request", error: "Message is required.", path: "/turns", status: 0 });
+        return;
+      }
+      if (state.pending.has("/turns") || state.activeTurnId || state.externalTurnRunning || state.promptAssistant.pending) return;
+      if (state.promptAssistant.enabled) {
+        await sendPromptAssistedMessage(draft, message);
+        return;
+      }
+      const pendingAssistant = createWaitingAssistant("Waiting for assistant response");
+      state.chatMessages.push({ role: "user", text: message });
+      state.chatMessages.push(pendingAssistant);
+      renderChatMessages({ forceScroll: true });
+      await startRealtimeTurn(message, draft, pendingAssistant, restoreDraftFactory(draft));
+    }
+
+    function updateMessageAction() {
+      if (!el.messageAction) return;
+      const busy = Boolean(state.activeTurnId)
+        || state.pending.has("/turns")
+        || state.promptAssistant.pending;
+      el.messageAction.textContent = busy ? "Cancel" : "Send";
+      el.messageAction.title = busy ? "Cancel current response" : "Send message";
+      el.messageAction.className = busy ? "danger" : "primary";
+      el.messageAction.dataset.endpoint = busy
+        ? (state.activeTurnId ? "/turns/{turnId}/cancel" : "/cancel")
+        : "/turns";
+      el.messageAction.disabled = state.externalTurnRunning;
+    }
+
+    function cancelPromptAssistantFlow() {
+      const current = state.promptAssistant;
+      if (!current.pending) return false;
+      state.promptAssistantRunId++;
+      current.pending = false;
+      if (current.userMessage) {
+        current.userMessage.promptAssistantUserTyping = false;
+        current.userMessage.text = current.originalMessage || current.userMessage.text || "";
+      }
+      if (current.assistantMessage) {
+        current.assistantMessage.timeline = [];
+        current.assistantMessage.promptAssistantQuestions = [];
+        current.assistantMessage.text = "Prompt Assistant canceled.";
+      }
+      updateMessageAction();
+      renderChatMessages();
+      return true;
+    }
+
+    async function cancelTurn() {
+      if (!state.activeTurnId && cancelPromptAssistantFlow()) return;
+      const path = state.activeTurnId
+        ? "/turns/" + encodeURIComponent(state.activeTurnId) + "/cancel"
+        : "/cancel";
+      const result = await request(path, { method: "POST", timeoutKind: "quick" });
+      writeJson(el.chatJson, result);
+    }
+
+    function handleMessageAction() {
+      if (state.externalTurnRunning) return;
+      if (state.activeTurnId || state.pending.has("/turns") || state.promptAssistant.pending) {
+        cancelTurn();
+        return;
+      }
+      sendMessage();
+    }
+
+    async function resetConversation() {
+      if (!confirm("Reset the in-memory conversation now?")) return;
+      const result = await request("/reset", { method: "POST", timeoutKind: "quick" });
+      writeJson(el.chatJson, result);
+      if (result.success) {
+        state.chatMessages = [];
+        state.chatPayloadSignature = "";
+        state.activeTurnId = "";
+        state.activeTurnMessage = null;
+        el.assistantText.classList.add("muted");
+        el.assistantText.textContent = "No response yet.";
+        renderChatMessages();
+        setPending("/turns", false);
+        updateMessageAction();
+      }
+    }
+
+    function updatePromptAssistantToggle() {
+      const enabled = state.promptAssistant.enabled;
+      const mode = enabled ? "advanced" : "default";
+      const label = enabled ? "Advanced Prompt" : "Default Prompt";
+      el.promptModeLabel.textContent = label;
+      el.promptModeButton.title = label;
+      el.promptModeButton.dataset.mode = mode;
+      document.querySelectorAll("[data-prompt-mode]").forEach(button => {
+        button.setAttribute("aria-checked", button.dataset.promptMode === mode ? "true" : "false");
+      });
+    }
+
+    function setPromptModeMenuOpen(open) {
+      el.promptModeMenu.hidden = !open;
+      el.promptModeButton.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    function togglePromptModeMenu() {
+      if (state.promptAssistant.pending || state.activeTurnId) return;
+      setPromptModeMenuOpen(el.promptModeMenu.hidden);
+    }
+
+    function selectPromptMode(mode) {
+      if (state.promptAssistant.pending || state.activeTurnId) return;
+      state.promptAssistant.enabled = mode === "advanced";
+      updatePromptAssistantToggle();
+      setPromptModeMenuOpen(false);
+      el.message.focus();
+    }
+
+    async function sendPromptAssistedMessage(draft, originalMessage) {
+      const userMessage = { role: "user", text: originalMessage };
+      const assistantMessage = createWaitingAssistant("Preparing refined prompt");
+      state.chatMessages.push(userMessage);
+      state.chatMessages.push(assistantMessage);
+      state.promptAssistant = {
+        enabled: state.promptAssistant.enabled,
+        originalMessage,
+        answers: [],
+        pending: false,
+        userMessage,
+        assistantMessage
+      };
+      el.message.value = "";
+      resizeMessageComposer();
+      renderChatMessages({ forceScroll: true });
+      await runPromptAssistantPlan([], draft);
+    }
+
+    function collectPromptAssistantAnswers() {
+      return Array.from(el.chatLog.querySelectorAll("[data-prompt-assistant-question-id]")).map(node => ({
+        questionId: node.dataset.promptAssistantQuestionId,
+        questionText: node.dataset.promptAssistantQuestionText,
+        answer: node.value
+      }));
+    }
+
+    async function generatePromptAssistantAnswer() {
+      if (state.promptAssistant.pending || state.activeTurnId) return;
+      const currentAnswers = collectPromptAssistantAnswers();
+      await runPromptAssistantPlan(state.promptAssistant.answers.concat(currentAnswers), "");
+    }
+
+    async function runPromptAssistantPlan(nextAnswers, draft) {
+      const current = state.promptAssistant;
+      if (current.pending || !current.userMessage || !current.assistantMessage) return;
+      const runId = ++state.promptAssistantRunId;
+      current.pending = true;
+      updateMessageAction();
+      current.assistantMessage.promptAssistantQuestions = [];
+      current.assistantMessage.text = "";
+      if (nextAnswers.length > 0) {
+        current.assistantMessage.timeline = [];
+        if (current.userMessage) current.userMessage.promptAssistantUserTyping = true;
+      } else {
+        current.assistantMessage.timeline = [{ type: "llm_wait_started", status: "running", emoji: "⏳", summary: "Preparing refined prompt" }];
+      }
+      renderChatMessages();
+
+      const result = await request("/brief/plan", {
+        method: "POST",
+        body: {
+          message: current.originalMessage,
+          answers: nextAnswers,
+          forceQuestions: nextAnswers.length === 0
+        },
+        timeoutKind: "long"
+      });
+      writeJson(el.briefJson, result);
+      if (runId !== state.promptAssistantRunId) return;
+      current.pending = false;
+      updateMessageAction();
+      const data = bodyOf(result) || {};
+      if (!result.success) {
+        current.assistantMessage.timeline = [];
+        current.assistantMessage.text = result.error || "Prompt Assistant failed.";
+        if (current.userMessage) {
+          current.userMessage.promptAssistantUserTyping = false;
+          current.userMessage.text = current.originalMessage;
+        }
+        restoreDraftFactory(draft)();
+        renderChatMessages();
+        return;
+      }
+
+      current.answers = nextAnswers;
+      if (data.needsQuestions) {
+        if (current.userMessage) current.userMessage.promptAssistantUserTyping = false;
+        const questions = Array.isArray(data.questions) ? data.questions : [];
+        current.assistantMessage.timeline = [];
+        current.assistantMessage.promptAssistantQuestions = questions;
+        current.assistantMessage.text = questions.length ? "" : "Prompt Assistant returned no question text.";
+        renderChatMessages();
+        const firstAnswer = el.chatLog.querySelector("[data-prompt-assistant-question-id]");
+        if (firstAnswer) firstAnswer.focus();
+        return;
+      }
+
+      const rewritten = String(data.rewrittenPrompt || "").trim();
+      current.assistantMessage.promptAssistantQuestions = [];
+      if (!rewritten) {
+        current.assistantMessage.timeline = [];
+        current.assistantMessage.text = "Prompt Assistant returned an empty prompt.";
+        if (current.userMessage) {
+          current.userMessage.promptAssistantUserTyping = false;
+          current.userMessage.text = current.originalMessage;
+        }
+        restoreDraftFactory(draft)();
+        renderChatMessages();
+        showError({ kind: "brief_plan_failed", error: "Prompt Assistant returned an empty prompt.", path: "/brief/plan", status: 0 });
+        return;
+      }
+
+      current.userMessage.promptAssistantUserTyping = false;
+      current.userMessage.text = rewritten;
+      current.assistantMessage.timeline = [{ type: "llm_wait_started", status: "running", emoji: "⏳", summary: "Waiting for assistant response" }];
+      current.assistantMessage.text = "";
+      renderChatMessages();
+      await startRealtimeTurn(rewritten, draft, current.assistantMessage, restoreDraftFactory(draft));
+      state.promptAssistant = {
+        enabled: state.promptAssistant.enabled,
+        originalMessage: "",
+        answers: [],
+        pending: false,
+        userMessage: null,
+        assistantMessage: null
+      };
+    }
+
+    async function loadPayload() {
+      const [previewResult, jsonResult] = await Promise.all([
+        request("/payload", { timeoutKind: "quick" }),
+        request("/payload/json", { timeoutKind: "quick" })
+      ]);
+      const previewData = bodyOf(previewResult) || {};
+      const jsonData = bodyOf(jsonResult) || {};
+      el.payloadTokens.textContent = formatScalar(valueAt(previewData, ["roughEstimatedTokens", "estimatedTokens"], "Unknown"));
+      el.payloadTools.textContent = formatScalar(valueAt(previewData, ["toolCount", "tools.length"], "Unknown"));
+      el.payloadSkills.textContent = formatScalar(valueAt(previewData, ["activeSkillNames.length", "skills.length"], "Unknown"));
+      writeJson(el.payloadPreview, previewData);
+      writeJson(el.payloadJson, jsonData);
+      el.lastRefresh.textContent = nowLabel();
+    }
+
+    function payloadMessagesOf(data) {
+      const messages = data?.payload?.messages || data?.messages || [];
+      return Array.isArray(messages) ? messages : [];
+    }
+
+    function formatMaybeJson(value) {
+      if (value === undefined || value === null) return "";
+      if (typeof value !== "string") return pretty(value);
+      const text = value.trim();
+      if (!text) return "";
+      try { return pretty(JSON.parse(text)); }
+      catch { return value; }
+    }
+
+    function findToolResultInPayload(data, toolCallId) {
+      const messages = payloadMessagesOf(data);
+      const resultMessage = messages.find(message => {
+        const role = String(message?.role || message?.Role || "").toLowerCase();
+        return role === "tool" && toolCallIdOf(message) === toolCallId;
+      }) || null;
+      let assistantCall = null;
+      for (const message of messages) {
+        const role = String(message?.role || message?.Role || "").toLowerCase();
+        if (role !== "assistant") continue;
+        assistantCall = toolCallsOf(message).find(call => toolCallIdOfCall(call) === toolCallId) || null;
+        if (assistantCall) break;
+      }
+      return { resultMessage, assistantCall };
+    }
+
+    function renderToolResultMeta(items) {
+      el.toolResultMeta.innerHTML = items.map(item =>
+        "<div class=\"strip-item\"><div class=\"metric-label\">" + escapeHtml(item.label) + "</div><div class=\"mono\">" + escapeHtml(item.value || "") + "</div></div>"
+      ).join("");
+    }
+
+    function openToolResultModal(title, metaItems, content) {
+      el.toolResultTitle.textContent = title || "Tool result";
+      renderToolResultMeta(metaItems || []);
+      el.toolResultContent.textContent = content || "";
+      el.toolResultModal.hidden = false;
+      el.closeToolResult.focus();
+    }
+
+    function closeToolResultModal() {
+      el.toolResultModal.hidden = true;
+    }
+
+    async function openToolResultFromActivity(row) {
+      const toolCallId = row?.dataset?.toolCallId || "";
+      if (!toolCallId) return;
+      const status = row.dataset.toolResultState || "";
+      if (status === "running") {
+        openToolResultModal("Tool result", [
+          { label: "tool_call_id", value: toolCallId },
+          { label: "status", value: "running" }
+        ], "아직 결과 없음.");
+        return;
+      }
+
+      const result = await request("/payload/json", { timeoutKind: "quick" });
+      const data = bodyOf(result) || {};
+      const { resultMessage, assistantCall } = findToolResultInPayload(data, toolCallId);
+      const toolName = resultMessage?.name || resultMessage?.Name || (assistantCall ? toolCallNameOf(assistantCall) : "");
+      const argsText = assistantCall ? formatMaybeJson(toolCallArgumentsOf(assistantCall)) : "";
+      const meta = [
+        { label: "tool_call_id", value: toolCallId },
+        { label: "name", value: toolName || "(unknown)" }
+      ];
+      if (!resultMessage) {
+        openToolResultModal("Tool result", meta, "현재 payload messages에서 해당 tool result를 찾을 수 없음. reset/compaction/turn 진행 중일 수 있음.");
+        return;
+      }
+
+      const contentText = formatMaybeJson(resultMessage.content ?? resultMessage.Content);
+      const sections = [];
+      if (argsText) sections.push("arguments\n" + argsText);
+      sections.push("content\n" + contentText);
+      openToolResultModal("Tool result", meta, sections.join("\n\n"));
+    }
+
+    async function loadMemory() {
+      const [result, usageResult] = await Promise.all([
+        request("/memory", { timeoutKind: "quick" }),
+        request("/usage", { timeoutKind: "quick" })
+      ]);
+      const data = bodyOf(result) || {};
+      const usage = bodyOf(usageResult) || {};
+      const usageAvailable = usageResult.success && usage.usageAvailable === true;
+      const lastInputTokens = usageAvailable ? valueAt(usage, ["inputTokens"], null) : null;
+      const lastOutputTokens = usageAvailable ? valueAt(usage, ["outputTokens"], null) : null;
+      const lastActualTokenSum = sumTokenParts(lastInputTokens, lastOutputTokens);
+      const roughDelta = usageAvailable ? roughDeltaSinceUsage(data, usage) : null;
+      const triggerTokenCount = valueAt(data, ["triggerTokenCount"], null);
+      const triggerTokenSource = valueAt(data, ["triggerTokenSource"], null);
+      el.memoryRequired.textContent = formatScalar(valueAt(data, ["required"], "Unknown"));
+      el.memoryMessages.textContent = formatScalar(valueAt(data, ["conversationMessages", "messageCount"], "Unknown"));
+      el.memoryTokens.textContent = formatScalar(valueAt(data, ["roughEstimatedTokens", "estimatedTokens"], "Unknown"));
+      setOptionalMetric(el.memoryLastInputTokensMetric, el.memoryLastInputTokens, lastInputTokens, formatInteger);
+      setOptionalMetric(el.memoryLastOutputTokensMetric, el.memoryLastOutputTokens, lastOutputTokens, formatInteger);
+      setOptionalMetric(el.memoryLastActualTokensMetric, el.memoryLastActualTokens, lastActualTokenSum, formatInteger);
+      setOptionalMetric(el.memoryRoughDeltaMetric, el.memoryRoughDelta, roughDelta, formatInteger);
+      setOptionalMetric(el.memoryTriggerTokensMetric, el.memoryTriggerTokens, valueAt(data, ["triggerTokenCount"], null), formatInteger);
+      setOptionalMetric(el.memoryTriggerSourceMetric, el.memoryTriggerSource, valueAt(data, ["triggerTokenSource"], null), formatTokenSource);
+      setOptionalMetric(el.memoryTriggerThresholdMetric, el.memoryTriggerThreshold, valueAt(data, ["options.triggerEstimatedTokens"], null), formatInteger);
+      const memoryRows = [
+        ["reason", valueAt(data, ["reason"], "Unknown")],
+        ["compaction", valueAt(data, ["required"], false) === true ? "required" : "not required"],
+        ["roughEstimatedTokens", valueAt(data, ["roughEstimatedTokens", "estimatedTokens"], "Unknown")],
+        ["compactableMessages", valueAt(data, ["compactableMessages"], "Unknown")],
+        ["preservedRecentMessages", valueAt(data, ["preservedRecentMessages"], "Unknown")],
+        ["triggerEstimatedTokens", valueAt(data, ["options.triggerEstimatedTokens"], "Unknown")],
+        ["targetEstimatedTokens", valueAt(data, ["options.targetEstimatedTokens"], "Unknown")],
+        ["memoryMessageName", valueAt(data, ["options.memoryMessageName"], "Unknown")]
+      ];
+      let insertAt = 3;
+      if (hasValue(lastInputTokens)) memoryRows.splice(insertAt++, 0, ["lastInputTokens", lastInputTokens]);
+      if (hasValue(lastOutputTokens)) memoryRows.splice(insertAt++, 0, ["lastOutputTokens", lastOutputTokens]);
+      if (hasValue(lastActualTokenSum)) memoryRows.splice(insertAt++, 0, ["lastInputPlusOutputTokens", lastActualTokenSum]);
+      if (hasValue(roughDelta)) memoryRows.splice(insertAt++, 0, ["roughDeltaSinceLastUsage", roughDelta]);
+      if (hasValue(triggerTokenCount)) memoryRows.splice(insertAt++, 0, ["triggerTokenCount", triggerTokenCount]);
+      if (hasValue(triggerTokenSource)) memoryRows.splice(insertAt++, 0, ["triggerTokenSource", formatTokenSource(triggerTokenSource)]);
+      renderRows(el.memoryTable, memoryRows);
+      writeJson(el.memoryJson, data);
+      el.lastRefresh.textContent = nowLabel();
+    }
+
+    async function compactMemory() {
+      if (!confirm("Compact conversation memory now? This can call the summary model.")) return;
+      const result = await request("/memory/compact", { method: "POST", timeoutKind: "long" });
+      const data = bodyOf(result) || {};
+      writeJson(el.memoryJson, { compactResult: data });
+      await loadMemory();
+    }
+
+    function normalizeSkills(data) {
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.loaded)) return data.loaded;
+      if (Array.isArray(data?.skills)) return data.skills;
+      return [];
+    }
+
+    async function loadSkills() {
+      const result = await request("/skills", { timeoutKind: "quick" });
+      const data = bodyOf(result) || {};
+      state.skills = normalizeSkills(data);
+      writeJson(el.skillsJson, data);
+      renderSkills();
+      el.lastRefresh.textContent = nowLabel();
+    }
+
+    function skillName(skill) {
+      return skill?.name || skill?.Name || skill?.id || skill?.skillName || String(skill);
+    }
+
+    function isSkillActive(skill) {
+      return Boolean(skill?.active || skill?.enabled || skill?.isActive);
+    }
+
+    function renderSkills() {
+      const filter = el.skillFilter.value.trim().toLowerCase();
+      const rows = state.skills.filter(skill => {
+        const text = pretty(skill).toLowerCase();
+        return !filter || text.includes(filter);
+      });
+      el.skillsList.innerHTML = rows.length ? rows.map(skill => {
+        const name = skillName(skill);
+        const active = isSkillActive(skill);
+        return "<div class=\"list-item\"><div class=\"item-head\"><div><div class=\"item-title\">" + escapeHtml(name) + "</div><div class=\"item-sub\">" + escapeHtml(skill.description || skill.Description || skill.category || skill.Category || "") + "</div></div><span class=\"badge " + (active ? "ok" : "") + "\">" + (active ? "active" : "inactive") + "</span></div><div class=\"toolbar\"><button data-skill-detail=\"" + escapeHtml(name) + "\">Details</button><button data-skill-change=\"activate\" data-skill-name=\"" + escapeHtml(name) + "\">Activate</button><button data-skill-change=\"deactivate\" data-skill-name=\"" + escapeHtml(name) + "\">Deactivate</button></div></div>";
+      }).join("") : "<div class=\"muted\">No skills returned.</div>";
+    }
+
+    async function loadSkillDetail(name) {
+      const trimmed = (name || el.skillName.value).trim();
+      if (!trimmed) {
+        showError({ kind: "invalid_request", error: "Skill name is required.", path: "/skills/{name}", status: 0 });
+        return;
+      }
+      const result = await request("/skills/" + encodeURIComponent(trimmed), { timeoutKind: "quick" });
+      const data = bodyOf(result) || {};
+      const skill = data.skill || data;
+      renderRows(el.skillDetailTable, [
+        ["name", valueAt(skill, ["name", "Name"], trimmed)],
+        ["category", valueAt(skill, ["category", "Category"], "Unknown")],
+        ["description", valueAt(skill, ["description", "Description"], "Unknown")],
+        ["filePath", valueAt(skill, ["filePath", "FilePath"], "Unknown")],
+        ["active", valueAt(skill, ["active"], "Unknown")]
+      ]);
+      el.skillInstructions.textContent = valueAt(skill, ["instructions", "Instructions"], "No instructions returned.");
+      writeJson(el.skillsJson, result);
+    }
+
+    async function changeSkill(name, active) {
+      const trimmed = (name || el.skillName.value).trim();
+      if (!trimmed) {
+        showError({ kind: "invalid_request", error: "Skill name is required.", path: active ? "/skill/activate" : "/skill/deactivate", status: 0 });
+        return;
+      }
+      await request(active ? "/skill/activate" : "/skill/deactivate", {
+        method: "POST",
+        body: { name: trimmed },
+        timeoutKind: "quick"
+      });
+      await loadSkills();
+    }
+
+    function normalizeMcpServers(data) {
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data?.available)) return data.available;
+      if (Array.isArray(data?.servers)) return data.servers;
+      if (Array.isArray(data?.active)) return data.active;
+      return [];
+    }
+
+    async function loadMcp() {
+      const [catalogResult, activeResult] = await Promise.all([
+        request("/mcp", { timeoutKind: "quick" }),
+        request("/mcp/active", { timeoutKind: "quick" })
+      ]);
+      const catalog = bodyOf(catalogResult) || {};
+      const active = bodyOf(activeResult) || {};
+      state.mcpServers = normalizeMcpServers(active.available ? active : catalog);
+      state.mcpActiveIds = Array.isArray(active.activeIds) ? active.activeIds : normalizeMcpServers(active).map(server => server.id || server.Id).filter(Boolean);
+      writeJson(el.mcpJson, { catalog, active });
+      renderMcp();
+      el.lastRefresh.textContent = nowLabel();
+    }
+
+    function mcpId(server) {
+      return server?.id || server?.Id || server?.serverId || server?.name || server?.Name || String(server);
+    }
+
+    function renderMcp() {
+      const activeSet = new Set(state.mcpActiveIds.map(id => String(id).toLowerCase()));
+      el.mcpList.innerHTML = state.mcpServers.length ? state.mcpServers.map(server => {
+        const id = mcpId(server);
+        const active = activeSet.has(String(id).toLowerCase()) || server.active === true;
+        return "<div class=\"list-item\"><div class=\"item-head\"><div><div class=\"item-title\">" + escapeHtml(id) + "</div><div class=\"item-sub\">" + escapeHtml(server.description || server.Description || server.transport || server.Transport || "") + "</div></div><span class=\"badge " + (active ? "ok" : "") + "\">" + (active ? "active" : "inactive") + "</span></div><label class=\"inline-check\"><input type=\"checkbox\" data-mcp-active=\"" + escapeHtml(id) + "\"" + (active ? " checked" : "") + ">active</label><div class=\"toolbar\"><button data-mcp-detail=\"" + escapeHtml(id) + "\">Server</button><button data-mcp-tools=\"" + escapeHtml(id) + "\"" + (active ? "" : " class=\"warning\"") + ">" + (active ? "Tools" : "Tools With Confirm") + "</button></div></div>";
+      }).join("") : "<div class=\"muted\">No MCP servers returned.</div>";
+    }
+
+    async function loadMcpServer(id) {
+      const trimmed = (id || el.mcpId.value).trim();
+      if (!trimmed) {
+        showError({ kind: "invalid_request", error: "MCP server id is required.", path: "/mcp/{id}", status: 0 });
+        return;
+      }
+      const result = await request("/mcp/" + encodeURIComponent(trimmed), { timeoutKind: "quick" });
+      writeJson(el.mcpJson, result);
+    }
+
+    async function loadMcpTools(id) {
+      const trimmed = (id || el.mcpId.value).trim();
+      if (!trimmed) {
+        showError({ kind: "invalid_request", error: "MCP server id is required.", path: "/mcp/{id}/tools", status: 0 });
+        return;
+      }
+      const active = state.mcpActiveIds.map(x => String(x).toLowerCase()).includes(trimmed.toLowerCase());
+      if (!active && !confirm("This server is not active. Tool listing can start external MCP work. Continue?")) return;
+      const result = await request("/mcp/" + encodeURIComponent(trimmed) + "/tools", { timeoutKind: "long" });
+      renderTools(bodyOf(result));
+      writeJson(el.mcpJson, result);
+    }
+
+    async function loadAllTools() {
+      const result = await request("/tools", { timeoutKind: "long" });
+      renderTools(bodyOf(result));
+      writeJson(el.mcpJson, result);
+    }
+
+    function renderTools(data) {
+      const tools = arrayify(data);
+      el.toolsList.innerHTML = tools.length ? tools.map(tool => {
+        const name = tool.name || tool.Name || tool.modelToolName || tool.ModelToolName || "tool";
+        const server = tool.serverId || tool.ServerId || tool.server || "built-in";
+        return "<details><summary>" + escapeHtml(server + " / " + name) + "</summary><pre>" + escapeHtml(pretty(tool)) + "</pre></details>";
+      }).join("") : "<div class=\"muted\">No tools returned.</div>";
+    }
+
+    async function applyMcpActive() {
+      const serverIds = Array.from(document.querySelectorAll("[data-mcp-active]:checked")).map(input => input.dataset.mcpActive);
+      if (!confirm("Replace active MCP server ids with: " + (serverIds.join(", ") || "none") + "?")) return;
+      const previous = state.mcpActiveIds.slice();
+      const result = await request("/mcp/active", { method: "PUT", body: { serverIds }, timeoutKind: "long" });
+      writeJson(el.mcpJson, { previousActiveIds: previous, result });
+      await loadMcp();
+    }
+
+    async function loadProxy() {
+      const result = await request("/proxy", { timeoutKind: "quick" });
+      const data = bodyOf(result) || {};
+      renderProxy(data);
+      writeJson(el.proxyJson, data);
+      el.lastRefresh.textContent = nowLabel();
+    }
+
+    function renderProxy(data) {
+      const config = data.config || data;
+      renderRows(el.proxyTable, [
+        ["mode", valueAt(data, ["status.mode", "mode"], "Unknown")],
+        ["owner", valueAt(data, ["lifecycle.owner"], "Unknown")],
+        ["sharedRisk", valueAt(data, ["sharedRisk", "lifecycle.sharedRisk"], "Unknown")],
+        ["policy", valueAt(data, ["lifecyclePolicy"], valueAt(data, ["lifecycle.warning"], "Unknown"))],
+        ["stopAllowed", valueAt(data, ["lifecycle.stopAllowed"], "Unknown")],
+        ["restartAllowed", valueAt(data, ["lifecycle.restartAllowed"], "Unknown")],
+        ["runtimeConfigUpdateAllowed", valueAt(data, ["lifecycle.runtimeConfigUpdateAllowed"], "Unknown")],
+        ["proxyUrl", valueAt(data, ["proxyUrl", "baseUrl"], "Unknown")],
+        ["adminAvailable", valueAt(data, ["adminAvailable", "config.fake"], "Unknown")],
+        ["configFile", valueAt(data, ["configFile", "appsettingsPath", "settingsPath"], "Unknown")],
+        ["stdout", valueAt(data, ["stdoutPath"], "Unknown")],
+        ["stderr", valueAt(data, ["stderrPath"], "Unknown")]
+      ]);
+      el.proxyBaseUrl.value = valueAt(config, ["baseUrl", "BaseUrl"], "");
+      el.proxyDefaultModel.value = valueAt(config, ["defaultModel", "DefaultModel"], "");
+      el.proxyEndpoint.value = valueAt(config, ["chatCompletionsEndpoint", "ChatCompletionsEndpoint"], "");
+      el.proxyTimeout.value = valueAt(config, ["requestTimeoutSeconds", "RequestTimeoutSeconds"], "");
+      const lifecycle = data.lifecycle || {};
+      el.stopProxy.disabled = lifecycle.stopAllowed === false;
+      el.restartProxy.disabled = lifecycle.restartAllowed === false;
+      el.saveProxyConfig.disabled = lifecycle.runtimeConfigUpdateAllowed === false && !el.proxyForceShared.checked;
+    }
+
+    async function loadProxyConfig() {
+      const result = await request("/proxy/config", { timeoutKind: "proxy" });
+      const data = bodyOf(result) || {};
+      renderProxy(data);
+      writeJson(el.proxyJson, result);
+    }
+
+    async function saveProxyConfig() {
+      const body = {
+        baseUrl: el.proxyBaseUrl.value || null,
+        chatCompletionsEndpoint: el.proxyEndpoint.value || null,
+        defaultModel: el.proxyDefaultModel.value || null,
+        requestTimeoutSeconds: el.proxyTimeout.value ? Number(el.proxyTimeout.value) : null,
+        applyOnly: el.proxyApplyOnly.checked,
+        persist: el.proxyPersist.checked,
+        forceSharedProxy: el.proxyForceShared.checked
+      };
+      const forceNote = body.forceSharedProxy ? " This can affect other AgentConsole sessions sharing the same ApiProxy." : "";
+      if (!confirm("Apply proxy runtime config now? persist=true is expected to be rejected by the server." + forceNote)) return;
+      const result = await request("/proxy/config", { method: "PUT", body, timeoutKind: "proxy" });
+      writeJson(el.proxyJson, result);
+      await loadProxy();
+    }
+
+    async function proxyAction(path, text) {
+      if (!confirm(text)) return;
+      const result = await request(path, { method: "POST", timeoutKind: "proxy" });
+      writeJson(el.proxyJson, result);
+      if (path !== "/proxy/stop") await loadProxy();
+    }
+
+    async function loadCommands() {
+      const result = await request("/commands", { timeoutKind: "quick" });
+      const data = bodyOf(result) || {};
+      writeJson(el.commandsJson, data);
+      const commands = Array.isArray(data.commands) ? data.commands : [];
+      el.commandList.innerHTML = commands.length ? commands.map(command => {
+        const name = command.name || command.Name || "";
+        const support = command.remoteSupport || command.RemoteSupport || "";
+        const unsupported = /unsupported/i.test(support);
+        return "<div class=\"list-item\"><div class=\"item-head\"><div><div class=\"item-title\">" + escapeHtml(name) + "</div><div class=\"item-sub\">" + escapeHtml(command.description || command.Description || command.remoteNote || command.RemoteNote || "") + "</div></div><span class=\"badge " + (unsupported ? "fail" : "ok") + "\">" + escapeHtml(support || "supported") + "</span></div><div class=\"toolbar\"><button data-command-example=\"" + escapeHtml(name) + "\"" + (unsupported ? " class=\"danger\"" : "") + ">Use</button></div></div>";
+      }).join("") : "<div class=\"muted\">No commands returned.</div>";
+      el.lastRefresh.textContent = nowLabel();
+    }
+
+    async function sendCommand() {
+      const command = el.commandText.value.trim();
+      if (!command) {
+        showError({ kind: "invalid_request", error: "Command is required.", path: "/command", status: 0 });
+        return;
+      }
+      if (/^\/(exit|quit)\b/i.test(command)) {
+        if (!confirm("This command is marked unsupported for remote control. Send anyway?")) return;
+      }
+      const result = await request("/command", { method: "POST", body: { command }, timeoutKind: "long" });
+      writeJson(el.commandsJson, result);
+    }
+
+    function renderOperations() {
+      const filter = el.operationFilter.value.trim().toLowerCase();
+      const operations = state.operations.filter(op => {
+        const text = [op.tag, op.method, op.path, op.summary, op.description].join(" ").toLowerCase();
+        return !filter || text.includes(filter);
+      });
+      el.operationList.innerHTML = operations.length ? operations.map(op => {
+        const danger = DANGER_ENDPOINTS.has(op.path) || op.method !== "GET";
+        return "<div class=\"list-item\"><div class=\"item-head\"><div><div class=\"item-title mono\">" + escapeHtml(op.method + " " + op.path) + "</div><div class=\"item-sub\">" + escapeHtml(op.tag + (op.summary ? " · " + op.summary : "")) + "</div></div><span class=\"badge " + (op.expectsEnvelope ? "ok" : "warn") + "\">" + (op.expectsEnvelope ? "envelope" : "raw") + "</span></div><div class=\"toolbar\"><button data-operation-key=\"" + escapeHtml(op.key) + "\"" + (danger ? " class=\"warning\"" : "") + ">Select</button></div></div>";
+      }).join("") : "<div class=\"muted\">No operations matched.</div>";
+    }
+
+    function selectOperation(key) {
+      state.selectedOperationKey = key;
+      const op = state.operations.find(item => item.key === key);
+      if (!op) return;
+      renderRows(el.operationDetail, [
+        ["method", op.method],
+        ["path", op.path],
+        ["tag", op.tag],
+        ["summary", op.summary || "Unknown"],
+        ["response", op.expectsEnvelope ? "success envelope" : "non-envelope"]
+      ]);
+      el.pathParams.innerHTML = pathParamNames(op.path).map(name =>
+        "<label>" + escapeHtml(name) + "<input data-path-param=\"" + escapeHtml(name) + "\" autocomplete=\"off\"></label>"
+      ).join("");
+      el.explorerBody.value = op.method === "GET" ? "" : pretty(defaultBodyFor(op));
+    }
+
+    function pathParamNames(path) {
+      return Array.from(path.matchAll(/\{([^}]+)\}/g)).map(match => match[1]);
+    }
+
+    function defaultBodyFor(op) {
+      if (op.path === "/message" || op.path === "/turns") return { message: "", continueAfterCancel: true };
+      if (op.path === "/brief/plan") return { message: "", answers: [], forceQuestions: false };
+      if (op.path === "/command") return { command: "/payload json" };
+      if (op.path.includes("/skill/")) return { name: "" };
+      if (op.path === "/mcp/active") return { serverIds: state.mcpActiveIds };
+      if (op.path === "/proxy/config") return { applyOnly: true, persist: false };
+      return {};
+    }
+
+    async function sendExplorer() {
+      const op = state.operations.find(item => item.key === state.selectedOperationKey);
+      if (!op) {
+        showError({ kind: "invalid_request", error: "Select an operation first.", path: "API Explorer", status: 0 });
+        return;
+      }
+      let path = op.path;
+      for (const input of document.querySelectorAll("[data-path-param]")) {
+        const value = input.value.trim();
+        if (!value) {
+          showError({ kind: "invalid_request", error: "Path parameter is required: " + input.dataset.pathParam, path: op.path, status: 0 });
+          return;
+        }
+        path = path.replace("{" + input.dataset.pathParam + "}", encodeURIComponent(value));
+      }
+      if (DANGER_ENDPOINTS.has(op.path) && !confirm("Send " + op.method + " " + op.path + "?")) return;
+      let body;
+      if (op.method !== "GET") {
+        const text = el.explorerBody.value.trim();
+        if (text) {
+          try { body = JSON.parse(text); }
+          catch (error) {
+            showError({ kind: "json_parse_failed", error: error.message, path: op.path, status: 0, bodyPreview: preview(text) });
+            return;
+          }
+        }
+      }
+      const result = await request(path, { method: op.method, body, timeoutKind: DANGER_ENDPOINTS.has(op.path) ? "long" : "normal" });
+      writeJson(el.explorerJson, result);
+    }
+
+    async function refreshActiveView() {
+      if (state.activeView === "status") return loadStatus();
+      if (state.activeView === "payload") return loadPayload();
+      if (state.activeView === "memory") return loadMemory();
+      if (state.activeView === "skills") return loadSkills();
+      if (state.activeView === "mcp") return loadMcp();
+      if (state.activeView === "proxy") return loadProxy();
+      if (state.activeView === "commands") return loadCommands();
+      if (state.activeView === "explorer") return loadOpenApi();
+      const result = await request("/health", { timeoutKind: "quick" });
+      writeJson(el.chatJson, result);
+    }
+
+    async function setView(name) {
+      state.activeView = name;
+      document.querySelectorAll("[data-view-button]").forEach(button => button.classList.toggle("active", button.dataset.viewButton === name));
+      document.querySelectorAll(".view").forEach(view => {
+        if (view.id === "view-chat") {
+          view.classList.add("active");
+        } else {
+          view.classList.toggle("active", view.id === "view-" + name);
+        }
+      });
+      if (name === "chat") {
+        closeOperations();
+      } else {
+        document.body.classList.add("ops-open");
+        await refreshActiveView();
+      }
+    }
+
+    document.querySelectorAll("[data-view-button]").forEach(button => button.addEventListener("click", () => void setView(button.dataset.viewButton)));
+    document.querySelectorAll("[data-copy]").forEach(button => button.addEventListener("click", async () => {
+      const source = document.querySelector("#" + button.dataset.copy);
+      await navigator.clipboard.writeText(source ? readText(source) : "");
+    }));
+    el.chatLog.addEventListener("click", async event => {
+      const activityRow = event.target.closest("[data-tool-call-id]");
+      if (activityRow) {
+        await openToolResultFromActivity(activityRow);
+        return;
+      }
+      const generate = event.target.closest("[data-prompt-assistant-generate]");
+      if (generate) {
+        await generatePromptAssistantAnswer();
+        return;
+      }
+      const button = event.target.closest("[data-copy-code]");
+      if (!button) return;
+      const source = document.querySelector("#" + button.dataset.copyCode);
+      if (!source) return;
+      await navigator.clipboard.writeText(source.textContent || "");
+      const previous = button.textContent;
+      button.textContent = "Copied";
+      window.setTimeout(() => { button.textContent = previous; }, 900);
+    });
+    el.closeToolResult.addEventListener("click", closeToolResultModal);
+    el.copyToolResult.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(el.toolResultContent.textContent || "");
+      const previous = el.copyToolResult.textContent;
+      el.copyToolResult.textContent = "Copied";
+      window.setTimeout(() => { el.copyToolResult.textContent = previous; }, 900);
+    });
+    el.toolResultModal.addEventListener("click", event => {
+      if (event.target === el.toolResultModal) closeToolResultModal();
+    });
+    document.querySelectorAll("[data-load-json]").forEach(button => button.addEventListener("click", () => loadJsonInto(button.dataset.loadJson, button.dataset.target)));
+
+    el.openOps.addEventListener("click", () => openOperations("status"));
+    el.settingsClose.addEventListener("click", () => {
+      setSettingsOpen(false);
+      el.openOps.focus();
+    });
+    el.settingsPanel.addEventListener("click", event => event.stopPropagation());
+    document.addEventListener("click", event => {
+      if (!document.body.classList.contains("settings-open")) return;
+      if (event.target.closest("#openOps") || event.target.closest("#settingsPanel")) return;
+      setSettingsOpen(false);
+    });
+    el.loadSpec.addEventListener("click", loadOpenApi);
+    el.closeOps.addEventListener("click", closeOperations);
+    el.opsBackdrop.addEventListener("click", closeOperations);
+    el.promptModeButton.addEventListener("click", togglePromptModeMenu);
+    el.promptModeMenu.addEventListener("click", event => {
+      const option = event.target.closest("[data-prompt-mode]");
+      if (!option) return;
+      selectPromptMode(option.dataset.promptMode);
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !el.toolResultModal.hidden) {
+        event.preventDefault();
+        closeToolResultModal();
+      } else if (event.key === "Escape" && document.body.classList.contains("settings-open")) {
+        event.preventDefault();
+        setSettingsOpen(false);
+        el.openOps.focus();
+      } else if (event.key === "Escape" && !el.promptModeMenu.hidden) {
+        event.preventDefault();
+        setPromptModeMenuOpen(false);
+        el.promptModeButton.focus();
+      }
+    });
+    document.addEventListener("click", event => {
+      if (el.promptModeMenu.hidden) return;
+      if (event.target.closest(".prompt-mode")) return;
+      setPromptModeMenuOpen(false);
+    });
+    el.refreshExplorerSpec.addEventListener("click", loadOpenApi);
+    el.refreshActive.addEventListener("click", refreshActiveView);
+    el.refreshStatus.addEventListener("click", loadStatus);
+    let messageComposing = false;
+    el.message.addEventListener("input", resizeMessageComposer);
+    el.message.addEventListener("compositionstart", () => { messageComposing = true; });
+    el.message.addEventListener("compositionend", () => { messageComposing = false; });
+    el.message.addEventListener("keydown", event => {
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing || messageComposing) return;
+      event.preventDefault();
+      sendMessage();
+    });
+    el.messageAction.addEventListener("click", handleMessageAction);
+    el.resetConversation.addEventListener("click", resetConversation);
+    updatePromptAssistantToggle();
+    updateMessageAction();
+    el.refreshPayload.addEventListener("click", loadPayload);
+    el.refreshMemory.addEventListener("click", loadMemory);
+    el.compactMemory.addEventListener("click", compactMemory);
+    el.refreshSkills.addEventListener("click", loadSkills);
+    el.skillFilter.addEventListener("input", renderSkills);
+    el.loadSkillDetail.addEventListener("click", () => loadSkillDetail());
+    el.activateSkill.addEventListener("click", () => changeSkill(null, true));
+    el.deactivateSkill.addEventListener("click", () => changeSkill(null, false));
+    el.skillsList.addEventListener("click", event => {
+      const detail = event.target.closest("[data-skill-detail]");
+      if (detail) {
+        el.skillName.value = detail.dataset.skillDetail;
+        loadSkillDetail(detail.dataset.skillDetail);
+        return;
+      }
+      const change = event.target.closest("[data-skill-change]");
+      if (change) {
+        el.skillName.value = change.dataset.skillName;
+        changeSkill(change.dataset.skillName, change.dataset.skillChange === "activate");
+      }
+    });
+    el.refreshMcp.addEventListener("click", loadMcp);
+    el.loadMcpServer.addEventListener("click", () => loadMcpServer());
+    el.loadMcpTools.addEventListener("click", () => loadMcpTools());
+    el.loadAllTools.addEventListener("click", loadAllTools);
+    el.applyMcpActive.addEventListener("click", applyMcpActive);
+    el.mcpList.addEventListener("click", event => {
+      const detail = event.target.closest("[data-mcp-detail]");
+      if (detail) {
+        el.mcpId.value = detail.dataset.mcpDetail;
+        loadMcpServer(detail.dataset.mcpDetail);
+        return;
+      }
+      const tools = event.target.closest("[data-mcp-tools]");
+      if (tools) {
+        el.mcpId.value = tools.dataset.mcpTools;
+        loadMcpTools(tools.dataset.mcpTools);
+      }
+    });
+    el.refreshProxy.addEventListener("click", loadProxy);
+    el.loadProxyConfig.addEventListener("click", loadProxyConfig);
+    el.saveProxyConfig.addEventListener("click", saveProxyConfig);
+    el.proxyForceShared.addEventListener("change", loadProxy);
+    el.checkProxyLlm.addEventListener("click", () => proxyAction("/proxy/check-llm", "Run upstream LLM health check now?"));
+    el.restartProxy.addEventListener("click", () => proxyAction("/proxy/restart", "Restart ApiProxy now?"));
+    el.stopProxy.addEventListener("click", () => proxyAction("/proxy/stop", "Stop ApiProxy now? The next request may fail."));
+    el.refreshCommands.addEventListener("click", loadCommands);
+    el.sendCommand.addEventListener("click", sendCommand);
+    el.commandList.addEventListener("click", event => {
+      const button = event.target.closest("[data-command-example]");
+      if (button) el.commandText.value = button.dataset.commandExample;
+    });
+    el.operationFilter.addEventListener("input", renderOperations);
+    el.operationList.addEventListener("click", event => {
+      const button = event.target.closest("[data-operation-key]");
+      if (button) selectOperation(button.dataset.operationKey);
+    });
+    el.sendExplorer.addEventListener("click", sendExplorer);
+    window.addEventListener("resize", resizeMessageComposer);
+
+    resizeMessageComposer();
+    startChatSyncTimer();
+    loadOpenApi().then(() => {
+      resizeMessageComposer();
+      return restoreChatFromPayload();
+    }).then(() => {
+      return loadStatus();
+    });
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

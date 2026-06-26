@@ -1,0 +1,10 @@
+[
+  "--control-only",
+  "--control-url",
+  "http://localhost:50015",
+  "--plain",
+  "--agent-name",
+  "\uC0DD\uC0B0\uAD00\uB9AC\uC790",
+  "--agent-role",
+  "\uC0DD\uC0B0 \uAD00\uB9AC\uC790"
+]

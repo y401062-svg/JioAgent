@@ -1,0 +1,14 @@
+[
+  "--control-only",
+  "--control-url",
+  "http://localhost:50002",
+  "--plain",
+  "--agent-name",
+  "WebAppTester",
+  "--agent-role",
+  "WebAppTester",
+  "--activate-mcp-server",
+  "playwright-mcp-python",
+  "--activate-mcp-server",
+  "python-filesystem-mcp"
+]

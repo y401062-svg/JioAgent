@@ -1,0 +1,27 @@
+{
+  "id": "playwright-mcp-python",
+  "name": "Python Playwright MCP",
+  "description": "Browser automation MCP server implemented with Python Playwright. Supports 22 browser automation tools including navigation, clicking, form filling, screenshots, JavaScript evaluation, and tab management.",
+  "transport": "stdio",
+  "command": "python",
+  "args": [
+    "-m",
+    "playwright_mcp",
+    "--headless",
+    "--isolated",
+    "--no-sandbox"
+  ],
+  "env": {
+    "PYTHONPATH": "..",
+    "PLAYWRIGHT_MCP_OUTPUT_DIR": "{tempPath}\\JioAgent\\McpServers\\{serverId}\\pid-{processId}\\output"
+  },
+  "workingDirectory": ".",
+  "stdioTimeoutSeconds": 30,
+  "tags": [
+    "python",
+    "stdio",
+    "playwright",
+    "browser",
+    "automation"
+  ]
+}

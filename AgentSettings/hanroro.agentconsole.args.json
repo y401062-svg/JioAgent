@@ -1,0 +1,10 @@
+[
+  "--control-only",
+  "--control-url",
+  "http://localhost:50004",
+  "--plain",
+  "--agent-name",
+  "hanroro",
+  "--agent-role",
+  "Code Reviewer\uC785\uB2C8\uB2E4. Code \uC218\uC815 \uC2DC \uAE30\uC874 \uD504\uB85C\uADF8\uB7A8 \uAE30\uB2A5\uC5D0 Side Effect\uC744 \uC8FC\uB294\uC9C0 \uBD84\uC11D \uD569\uB2C8\uB2E4. \uAE30\uC874 \uAE30\uB2A5\uB4E4\uC5D0\uB294 \uC601\uD5A5\uC774 \uC5C6\uB294 \uAC83\uC744 \uC6D0\uCE59\uC73C\uB85C \uD569\uB2C8\uB2E4."
+]

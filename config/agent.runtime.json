@@ -1,0 +1,29 @@
+{
+  "apiProxyExecutablePath": "ApiProxy/ApiProxy.exe",
+  "skillsRoot": "Skills",
+  "mcpServersRoot": "McpServers",
+  "model": null,
+  "activeSkillNames": [],
+  "additionalSystemInstruction": "",
+  "temperature": null,
+  "maxTokens": null,
+  "requestTimeoutSeconds": 600,
+  "noControlServer": false,
+  "maxToolRounds": 5,
+  "toolRoundLimitEnabled": false,
+  "proxyStartTimeoutSeconds": 20,
+  "noStartProxy": false,
+  "printPayload": false,
+  "skipPowerShellApproval": true,
+  "memorySummaryModel": null,
+  "memoryCompaction": {
+    "enabled": true,
+    "triggerEstimatedTokens": 100000,
+    "targetEstimatedTokens": 20000,
+    "keepRecentMessages": 10,
+    "keepRecentUserTurns": 2,
+    "minMessagesToCompact": 5,
+    "summaryMaxTokens": 10000,
+    "memoryMessageName": "conversation_memory"
+  }
+}

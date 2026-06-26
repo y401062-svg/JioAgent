@@ -1,0 +1,174 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "AgentConsole/1.0.0": {
+        "dependencies": {
+          "AgentBriefing": "1.0.0",
+          "AgentRuntime": "1.0.0",
+          "Markdig": "0.38.0",
+          "Spectre.Console": "0.50.0"
+        },
+        "runtime": {
+          "AgentConsole.dll": {}
+        }
+      },
+      "Markdig/0.38.0": {
+        "runtime": {
+          "lib/net8.0/Markdig.dll": {
+            "assemblyVersion": "0.38.0.0",
+            "fileVersion": "0.38.0.0"
+          }
+        }
+      },
+      "Spectre.Console/0.50.0": {
+        "dependencies": {
+          "System.Memory": "4.6.3"
+        },
+        "runtime": {
+          "lib/net8.0/Spectre.Console.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.50.0.0"
+          }
+        }
+      },
+      "System.Memory/4.6.3": {},
+      "AgentBriefing/1.0.0": {
+        "dependencies": {
+          "McpClient": "1.0.0",
+          "PayloadEngine": "1.0.0",
+          "Skills": "1.0.0"
+        },
+        "runtime": {
+          "AgentBriefing.dll": {}
+        }
+      },
+      "AgentRuntime/1.0.0": {
+        "dependencies": {
+          "AgentBriefing": "1.0.0",
+          "BuiltInMcpServer": "1.0.0",
+          "McpClient": "1.0.0",
+          "MemoryCompaction": "1.0.0",
+          "PayloadEngine": "1.0.0",
+          "TeamRuntime": "1.0.0"
+        },
+        "runtime": {
+          "AgentRuntime.dll": {}
+        }
+      },
+      "BuiltInMcpServer/1.0.0": {
+        "dependencies": {
+          "PayloadEngine": "1.0.0",
+          "Skills": "1.0.0"
+        },
+        "runtime": {
+          "BuiltInMcpServer.dll": {}
+        }
+      },
+      "McpClient/1.0.0": {
+        "runtime": {
+          "McpClient.dll": {}
+        }
+      },
+      "MemoryCompaction/1.0.0": {
+        "dependencies": {
+          "PayloadEngine": "1.0.0"
+        },
+        "runtime": {
+          "MemoryCompaction.dll": {}
+        }
+      },
+      "PayloadEngine/1.0.0": {
+        "dependencies": {
+          "McpClient": "1.0.0",
+          "Skills": "1.0.0"
+        },
+        "runtime": {
+          "PayloadEngine.dll": {}
+        }
+      },
+      "Skills/1.0.0": {
+        "runtime": {
+          "Skills.dll": {}
+        }
+      },
+      "TeamRuntime/1.0.0": {
+        "runtime": {
+          "TeamRuntime.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "AgentConsole/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Markdig/0.38.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-zKy3JFjQvr1wbuMtbfcZVjNNCIqHxSCjGMq/CBcyNsY/MPsxqcS3o8M7CZ2kcMGGIw5LI2ZZd8rFUaFeV6SvrQ==",
+      "path": "markdig/0.38.0",
+      "hashPath": "markdig.0.38.0.nupkg.sha512"
+    },
+    "Spectre.Console/0.50.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-gkwYncFqMjlPF6Yz8KeVsKWpdfv15sr6uKm+vXVa/8Q4tvx52LPzMQOO5m+bXwI3AGGFeY3cok3ZJbguYizswg==",
+      "path": "spectre.console/0.50.0",
+      "hashPath": "spectre.console.0.50.0.nupkg.sha512"
+    },
+    "System.Memory/4.6.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-qdcDOgnFZY40+Q9876JUHnlHu7bosOHX8XISRoH94fwk6hgaeQGSgfZd8srWRZNt5bV9ZW2TljcegDNxsf+96A==",
+      "path": "system.memory/4.6.3",
+      "hashPath": "system.memory.4.6.3.nupkg.sha512"
+    },
+    "AgentBriefing/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "AgentRuntime/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "BuiltInMcpServer/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "McpClient/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "MemoryCompaction/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "PayloadEngine/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Skills/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "TeamRuntime/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
