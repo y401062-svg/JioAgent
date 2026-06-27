@@ -1,9 +1,0 @@
-ApiProxy already running; using existing process.
-
-AgentConsole
---------------------------------
-Type /help for commands. Press Ctrl+C during a response to cancel the active turn.
-  Control server                  : enabled
-  Control URL                     : http://localhost:5068/ (localhost-only development control server)
-
-You> 
