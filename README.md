@@ -1,10 +1,10 @@
-# JioAgent
+﻿# JioAgent
 
 JioAgent는 여러 AI 에이전트를 한 PC에서 실행하고, 팀 단위 작업을 관리하기 위한 .NET 8 기반 에이전트 런타임입니다. 단일 콘솔 채팅, 로컬 API 프록시, 에이전트 관리 GUI, 팀 작업 상태 저장소, Skill 및 MCP 서버 확장을 한 배포 폴더 안에서 함께 다룹니다.
 
 ## 데모 영상
 
-![JioAgent demo](assets/jioagent-demo.gif)
+<img src="assets/jioagent-demo.gif" alt="JioAgent demo" width="100%">
 
 ## 주요 기능
 
@@ -307,3 +307,4 @@ D:\src\jio_agent\jio_agent\deploy\publish-deploy.ps1
 ```
 
 실행 중인 `AgentConsole.exe`, `AgentFleetManager.exe`, `ApiProxy.exe`가 배포 파일을 잠글 수 있으므로, 재배포 전에는 관련 프로세스를 종료하는 것이 좋습니다.
+
