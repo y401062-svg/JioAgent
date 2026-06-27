@@ -4,7 +4,7 @@
 
 ## 데모 영상
 
-<img src="assets/jioagent-demo.gif" alt="AgentFleetManager demo" width="100%">
+<img src="assets/jioagent-demo-wide.gif" alt="AgentFleetManager demo" width="100%">
 
 ## 무엇을 하는 프로그램인가
 
